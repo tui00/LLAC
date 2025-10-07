@@ -29,14 +29,9 @@ class Program
     }
 }
 
-public class LLAC
+public class LLAC(string file)
 {
-    public readonly string[] code;
-
-    public LLAC(string file)
-    {
-        code = file.Split("\n");
-    }
+    public readonly string[] code = file.Split("\n");
 
     public string Convert()
     {
