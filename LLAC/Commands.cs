@@ -34,7 +34,7 @@ public partial class LLAC
         ];
     }
 
-    private string[] ReadKey(string[] args, string label)
+    private string[] ReadChar(string[] args, string label)
     {
         nextLoopId++;
         return [$"{label}:ld {args[0]},{0x3E}", $"test {args[0]}", $"jz {label}"];
