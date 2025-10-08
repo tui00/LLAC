@@ -1,6 +1,6 @@
 namespace LLAC;
 
-public class LLAC(string file)
+public partial class LLAC(string file)
 {
     public readonly string file = file;
 
@@ -13,7 +13,21 @@ public class LLAC(string file)
 
     public string ConvertLine(string line)
     {
-        return ConvertWords(line.Split(" "));
+        return ConvertWords(RemoveComments(line).Trim().Split(" "));
+    }
+
+    private static string RemoveComments(string line)
+    {
+        line += " ";
+        bool inString = false;
+        for (int i = 0; i < line.Length; i++)
+        {
+            char ch = line[i];
+            if (ch == '\\') i++;
+            else if (ch == '"') inString = !inString;
+            else if (ch == ';' && !inString) return line[..i].TrimEnd();
+        }
+        return line;
     }
 
     private string ConvertWords(string[] words)
