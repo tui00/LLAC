@@ -25,16 +25,17 @@ public class LLAC(string file)
 
         string[] fragment = [];
 
-        switch (op)
+        string label = $"_loopLLAC{nextLoopId++}";
+        switch (op.ToLower())
         {
             // === Доп. команды ===
             case "in":
                 // 0x3E порт ввода
                 fragment = [
-                    $"{GetLoopLabel(false)}:", // Сохраняем метку
+                    $"{label}:", // Сохраняем метку
                     $"ld {args[0]} 0x3E", // Считываем
                     $"test {args[0]}", // Если ничего
-                    $"jz {GetLoopLabel(true)}" // Переходим на метку
+                    $"jz {label}" // Переходим на метку
                 ];
                 break;
 
@@ -46,16 +47,10 @@ public class LLAC(string file)
             // === Остальное ===
             default:
                 fragment = [string.Join(" ", words)];
+                nextLoopId--; // Вернуть как было
                 break;
         }
 
         return string.Join("\n", fragment);
-    }
-
-    private string GetLoopLabel(bool change)
-    {
-        int tmp = nextLoopId;
-        nextLoopId += change ? 1 : 0;
-        return $"_loopLLAC{tmp}";
     }
 }
