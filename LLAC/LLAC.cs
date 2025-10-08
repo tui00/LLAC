@@ -30,7 +30,7 @@ public class LLAC(string file)
         switch (op.ToLower())
         {
             // === Доп. команды ===
-            case "setup":
+            case "setup" when args.Length > 0 && args.Length <= 5:
                 byte devices = 0;
                 if (args.Contains("display")) devices |= 0b00_01_0000; // Устоновка монохроного режима экрана
                 if (args.Contains("coldisplay")) devices |= 0b00_11_0000; // Устоновка цветного режима экрана
@@ -42,7 +42,7 @@ public class LLAC(string file)
                     "st a, 0x3E" // Записываем в порт
                 ];
                 break;
-            case "readkey":
+            case "readkey" when args.Length == 1:
                 // 0x3E порт ввода
                 fragment = [
                     $"{label}:ld {args[0]}, 0x3E", // Считываем
