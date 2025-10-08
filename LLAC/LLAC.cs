@@ -8,32 +8,33 @@ public partial class LLAC(string file)
 
     public string Convert()
     {
-        return string.Join("\n", file.Split("\n").Select(ConvertLine));
+        return string.Join("\n", file.Split("\n").Select(ConvertLine)).Replace("\n\n", "\n").Trim();
     }
 
     private static string RemoveComments(string line)
     {
-        line += " ";
         bool inString = false;
-        for (int i = 0; i < line.Length; i++)
+        int i;
+        for (i = 0; i < line.Length; i++)
         {
             char ch = line[i];
             if (ch == '\\') i++;
             else if (ch == '"') inString = !inString;
-            else if (ch == ';' && !inString) return line[..i].TrimEnd();
+            else if (ch == ';' && !inString) break;
         }
-        return line;
+        if (i < 0) i = 0;
+        return line[..i].Trim(' ');
     }
 
     public string ConvertLine(string line)
     {
-        line = RemoveComments(line).Trim();
-        string[] words = [.. line.Split(' ').Select(word => word.Trim(','))];
+        line = RemoveComments(line);
+        string[] words = [.. line.Split(' ')];
         if (words.Length == 0)
             return "";
 
         string op = words[0];
-        string[] args = words[1..];
+        string[] args = [.. words[1..].Select(arg => arg.Trim(','))];
 
         string label = $"_loopLLAC{nextLoopId}";
 
@@ -41,9 +42,9 @@ public partial class LLAC(string file)
         switch (op.ToLower())
         {
             // === Доп. команды ===
-            case "setup" when args.Length > 0 && args.Length <= 5: fragment = Setup(args); break;
+            case "connect" when args.Length > 0 && args.Length <= 5: fragment = Connect(args); break;
             case "readkey" when args.Length == 1: fragment = ReadKey(args, label); break;
-            case "writechar" when args.Length == 1 || args.Length == 3: fragment = WriteChar(args); break;
+            case "writechar" when words[1..].Length != 0: fragment = WriteChar(string.Join(" ", words[1..])); break;
 
             // === Остальное ===
             default:
@@ -53,61 +54,11 @@ public partial class LLAC(string file)
                 }
                 else
                 {
-                    fragment = [op + " " + string.Join(",", args)];
+                    fragment = [op + (args.Length != 0 ? " " : "") + string.Join(",", args)];
                 }
                 break;
         }
 
         return string.Join("\n", fragment);
-    }
-
-    private static bool TryAlias(string op, string[] args, out string[] fragment)
-    {
-        switch (op)
-        {
-            case "exit":
-                fragment = ["hlt"];
-                return true;
-        }
-        fragment = [];
-        return false;
-    }
-
-    private static string[] WriteChar(string[] args)
-    {
-        string[] fragment;
-        string arg = args.Length == 3 ? "' '" : args[0];
-        fragment = arg.Length != 1 ? [$"lda a,{arg[1]}"] : [];
-        fragment = [.. fragment, $"st {(arg.Length == 1 ? arg : "a")},{0x3C}"];
-        return fragment;
-    }
-
-    private string[] ReadKey(string[] args, string label)
-    {
-        string[] fragment;
-        // 0x3E порт ввода
-        fragment = [
-            $"{label}:ld {args[0]},{0x3E}", // Считываем
-                    $"test {args[0]}", // Если ничего
-                    $"jz {label}" // Переходим на метку
-        ];
-        nextLoopId++;
-        return fragment;
-    }
-
-    private static string[] Setup(string[] args)
-    {
-        string[] fragment;
-        byte devices = 0;
-        if (args.Contains("display")) devices |= 0b00_01_0000; // Устоновка монохроного режима экрана
-        if (args.Contains("coldisplay")) devices |= 0b00_11_0000; // Устоновка цветного режима экрана
-        if (args.Contains("terminal")) devices |= 0b0000000_1; // Устоновка терминала
-        if (args.Contains("digit")) devices |= 0b00000_01_0; // Устоновка беззнакового режима
-        if (args.Contains("digitsign")) devices |= 0b00000_11_0; // Устоновка знакового режима
-        fragment = [
-            $"ldi a,{devices}", // Сохраняем девайсы в регистер
-                    $"st a,{0x3E}" // Записываем в порт
-        ];
-        return fragment;
     }
 }
