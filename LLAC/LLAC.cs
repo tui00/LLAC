@@ -49,14 +49,14 @@ public partial class LLAC(string file)
                 if (args.Contains("digit")) devices |= 0b00000_01_0; // Устоновка беззнакового режима
                 if (args.Contains("digitsign")) devices |= 0b00000_11_0; // Устоновка знакового режима
                 fragment = [
-                    $"ldi a, {devices}", // Сохраняем девайсы в регистер
-                    "st a,0x3E" // Записываем в порт
+                    $"ldi a,{devices}", // Сохраняем девайсы в регистер
+                    $"st a,{0x3E}" // Записываем в порт
                 ];
                 break;
             case "readkey" when args.Length == 1:
                 // 0x3E порт ввода
                 fragment = [
-                    $"{label}:ld {args[0]},0x3E", // Считываем
+                    $"{label}:ld {args[0]},{0x3E}", // Считываем
                     $"test {args[0]}", // Если ничего
                     $"jz {label}" // Переходим на метку
                 ];
@@ -64,16 +64,8 @@ public partial class LLAC(string file)
                 break;
             case "writechar" when args.Length == 1 || args.Length == 3:
                 string arg = args.Length == 3 ? "' '" : args[0];
-                if (arg.StartsWith('\''))
-                {
-                    fragment = [$"lda a,{arg[1]}"];
-                    arg = "a";
-                }
-                else
-                {
-                    fragment = [];
-                }
-                fragment = [.. fragment, $"st {arg},0x3C"];
+                fragment = arg.Length != 1 ? [$"lda a,{arg[1]}"] : [];
+                fragment = [.. fragment, $"st {(arg.Length == 1 ? arg : "a")},{0x3C}"];
                 break;
 
             // === Алиасы ===
