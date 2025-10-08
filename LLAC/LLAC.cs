@@ -45,6 +45,7 @@ public partial class LLAC(string file)
             case "connect" when args.Length > 0 && args.Length <= 5: fragment = Connect(args); break;
             case "readkey" when args.Length == 1: fragment = ReadKey(args, label); break;
             case "writechar" when words[1..].Length != 0: fragment = WriteChar(string.Join(" ", words[1..])); break;
+            case "writeline" when words[1..].Length != 0: fragment = WriteLine(args, label); break;
 
             // === Остальное ===
             default:
@@ -54,7 +55,7 @@ public partial class LLAC(string file)
                 }
                 else
                 {
-                    fragment = [op + (args.Length != 0 ? " " : "") + string.Join(",", args)];
+                    fragment = [line];
                 }
                 break;
         }

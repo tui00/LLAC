@@ -20,6 +20,21 @@ public partial class LLAC
         return [.. fragment, $"st {(char.IsLetter(arg[0]) ? arg[0] : 'a')},{0x3C}"];
     }
 
+    private static string[] WriteLine(string[] args, string label)
+    {
+        return [
+            $"ldi b,{args[0]}", // Сохраняем в b адрес текста
+            $"ldi c,{args[1]}", // Сохраняем в c размер текста
+            $"ldi d,{0x3C}", // Сохраняем в d адрес терминала
+
+            $"{label}:ld a,b", // Помещяем в a букву
+            $"st a,d", // Отправляем букву в терминал
+            $"inc b", // Увеличиваем адрес буквы
+            $"dec c", // Уменьшаем счетчик длины оставшегося текста
+            $"jnz {label}", // Если счетчик не 0 повторяем
+        ];
+    }
+
     private string[] ReadKey(string[] args, string label)
     {
         nextLoopId++;
