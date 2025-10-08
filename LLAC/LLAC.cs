@@ -24,7 +24,7 @@ public class LLAC(string file)
         string op = words[0];
         string[] args = words[1..];
 
-        string label = $"_loopLLAC{nextLoopId++}";
+        string label = $"_loopLLAC{nextLoopId}";
 
         string[] fragment;
         switch (op.ToLower())
@@ -49,6 +49,7 @@ public class LLAC(string file)
                     $"test {args[0]}", // Если ничего
                     $"jz {label}" // Переходим на метку
                 ];
+                nextLoopId++;
                 break;
 
             // === Алиасы ===
@@ -59,7 +60,6 @@ public class LLAC(string file)
             // === Остальное ===
             default:
                 fragment = [string.Join(" ", words)];
-                nextLoopId--; // Вернуть как было
                 break;
         }
 
