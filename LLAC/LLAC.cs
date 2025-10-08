@@ -29,6 +29,18 @@ public class LLAC(string file)
         switch (op.ToLower())
         {
             // === Доп. команды ===
+            case "setup":
+                byte devices = 0;
+                if (args.Contains("display")) devices |= 0b00_01_0000; // Устоновка монохроного режима экрана
+                if (args.Contains("coldisplay")) devices |= 0b00_11_0000; // Устоновка цветного режима экрана
+                if (args.Contains("terminal")) devices |= 0b0000000_1; // Устоновка терминала
+                if (args.Contains("digit")) devices |= 0b00000_01_0; // Устоновка беззнакового режима
+                if (args.Contains("digitsign")) devices |= 0b00000_11_0; // Устоновка знакового режима
+                fragment = [
+                    $"ldi a {devices}", // Сохраняем девайсы в регистер
+                    "st a 0x3E" // Записываем в порт
+                ];
+                break;
             case "readkey":
                 // 0x3E порт ввода
                 fragment = [
