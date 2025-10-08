@@ -32,7 +32,7 @@ public partial class LLAC(string file)
 
     private string ConvertWords(string[] words)
     {
-        words = [.. words.Select(word => word.Replace(",", ""))];
+        words = [.. words.Select(word => word.Trim(','))];
         if (words.Length == 0)
             return "";
         string op = words[0];
