@@ -29,7 +29,7 @@ public class LLAC(string file)
         switch (op.ToLower())
         {
             // === Доп. команды ===
-            case "in":
+            case "readkey":
                 // 0x3E порт ввода
                 fragment = [
                     $"{label}:", // Сохраняем метку
