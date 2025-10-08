@@ -16,8 +16,7 @@ public partial class LLAC
 
     private static string[] WriteChar(string arg)
     {
-        string[] fragment = char.IsLetter(arg[0]) ? [] : [$"ldi a,{arg[1]}"];
-        return [.. fragment, $"st {(char.IsLetter(arg[0]) ? arg[0] : 'a')},{0x3C}"];
+        return [$"st {arg},{0x3C}"];
     }
 
     private static string[] WriteLine(string[] args, string label)
