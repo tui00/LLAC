@@ -73,7 +73,7 @@ public partial class LLAC(string file)
 
             // === Остальное ===
             default:
-                fragment = [string.Join(" ", words)];
+                fragment = [op + " " + string.Join(",", args)];
                 break;
         }
 
