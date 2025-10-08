@@ -1,0 +1,48 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: .NET
+
+on:
+  push:
+    branches: 'main'
+  pull_request:
+    branches: '**'
+
+jobs:
+  core-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Publish
+        run: |
+          dotnet build LLAC/LLAC.csproj --configuration Debug --output ./publish_Core --self-contained false --framework net9.0
+  publish-release:
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: ['win-x64', 'win-arm64', 'linux-x64', 'linux-musl-x64', 'linux-musl-arm64', 'linux-arm64', 'osx-x64', 'osx-arm64']
+        project: ['LLAC']
+    needs: core-build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Publish
+        run: |
+          dotnet publish ${{ matrix.project }}/${{ matrix.project }}.csproj --configuration Debug --runtime ${{ matrix.rid }} --output ./publish_${{ matrix.rid }}_${{ matrix.project }} --self-contained false --framework net9.0
+      - name: Create README.txt
+        run: |
+          echo "Привет! Чтобы запустить програму, установите .NET 9.0 Runtime" > ./publish_${{ matrix.rid }}_${{ matrix.project }}/README.txt
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.project }}-${{ matrix.rid }}-build
+          path: ./publish_${{ matrix.rid }}_${{ matrix.project }}
