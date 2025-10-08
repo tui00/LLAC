@@ -11,11 +11,6 @@ public partial class LLAC(string file)
         return string.Join("\n", file.Split("\n").Select(ConvertLine));
     }
 
-    public string ConvertLine(string line)
-    {
-        return ConvertWords(RemoveComments(line).Trim().Split(" "));
-    }
-
     private static string RemoveComments(string line)
     {
         line += " ";
@@ -30,11 +25,13 @@ public partial class LLAC(string file)
         return line;
     }
 
-    private string ConvertWords(string[] words)
+    public string ConvertLine(string line)
     {
-        words = [.. words.Select(word => word.Trim(','))];
+        line = RemoveComments(line).Trim();
+        string[] words = [.. line.Split(' ').Select(word => word.Trim(','))];
         if (words.Length == 0)
             return "";
+
         string op = words[0];
         string[] args = words[1..];
 
@@ -64,6 +61,19 @@ public partial class LLAC(string file)
                     $"jz {label}" // Переходим на метку
                 ];
                 nextLoopId++;
+                break;
+            case "writechar" when args.Length == 1 || args.Length == 3:
+                string arg = args.Length == 3 ? "' '" : args[0];
+                if (arg.StartsWith('\''))
+                {
+                    fragment = [$"lda a,{arg[1]}"];
+                    arg = "a";
+                }
+                else
+                {
+                    fragment = [];
+                }
+                fragment = [.. fragment, $"st {arg},0x3C"];
                 break;
 
             // === Алиасы ===
