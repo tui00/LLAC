@@ -41,44 +41,73 @@ public partial class LLAC(string file)
         switch (op.ToLower())
         {
             // === Доп. команды ===
-            case "setup" when args.Length > 0 && args.Length <= 5:
-                byte devices = 0;
-                if (args.Contains("display")) devices |= 0b00_01_0000; // Устоновка монохроного режима экрана
-                if (args.Contains("coldisplay")) devices |= 0b00_11_0000; // Устоновка цветного режима экрана
-                if (args.Contains("terminal")) devices |= 0b0000000_1; // Устоновка терминала
-                if (args.Contains("digit")) devices |= 0b00000_01_0; // Устоновка беззнакового режима
-                if (args.Contains("digitsign")) devices |= 0b00000_11_0; // Устоновка знакового режима
-                fragment = [
-                    $"ldi a,{devices}", // Сохраняем девайсы в регистер
-                    $"st a,{0x3E}" // Записываем в порт
-                ];
-                break;
-            case "readkey" when args.Length == 1:
-                // 0x3E порт ввода
-                fragment = [
-                    $"{label}:ld {args[0]},{0x3E}", // Считываем
-                    $"test {args[0]}", // Если ничего
-                    $"jz {label}" // Переходим на метку
-                ];
-                nextLoopId++;
-                break;
-            case "writechar" when args.Length == 1 || args.Length == 3:
-                string arg = args.Length == 3 ? "' '" : args[0];
-                fragment = arg.Length != 1 ? [$"lda a,{arg[1]}"] : [];
-                fragment = [.. fragment, $"st {(arg.Length == 1 ? arg : "a")},{0x3C}"];
-                break;
-
-            // === Алиасы ===
-            case "exit":
-                fragment = ["hlt"];
-                break;
+            case "setup" when args.Length > 0 && args.Length <= 5: fragment = Setup(args); break;
+            case "readkey" when args.Length == 1: fragment = ReadKey(args, label); break;
+            case "writechar" when args.Length == 1 || args.Length == 3: fragment = WriteChar(args); break;
 
             // === Остальное ===
             default:
-                fragment = [op + " " + string.Join(",", args)];
+                if (TryAlias(op, args, out string[] aliasFragment))
+                {
+                    fragment = aliasFragment;
+                }
+                else
+                {
+                    fragment = [op + " " + string.Join(",", args)];
+                }
                 break;
         }
 
         return string.Join("\n", fragment);
+    }
+
+    private static bool TryAlias(string op, string[] args, out string[] fragment)
+    {
+        switch (op)
+        {
+            case "exit":
+                fragment = ["hlt"];
+                return true;
+        }
+        fragment = [];
+        return false;
+    }
+
+    private static string[] WriteChar(string[] args)
+    {
+        string[] fragment;
+        string arg = args.Length == 3 ? "' '" : args[0];
+        fragment = arg.Length != 1 ? [$"lda a,{arg[1]}"] : [];
+        fragment = [.. fragment, $"st {(arg.Length == 1 ? arg : "a")},{0x3C}"];
+        return fragment;
+    }
+
+    private string[] ReadKey(string[] args, string label)
+    {
+        string[] fragment;
+        // 0x3E порт ввода
+        fragment = [
+            $"{label}:ld {args[0]},{0x3E}", // Считываем
+                    $"test {args[0]}", // Если ничего
+                    $"jz {label}" // Переходим на метку
+        ];
+        nextLoopId++;
+        return fragment;
+    }
+
+    private static string[] Setup(string[] args)
+    {
+        string[] fragment;
+        byte devices = 0;
+        if (args.Contains("display")) devices |= 0b00_01_0000; // Устоновка монохроного режима экрана
+        if (args.Contains("coldisplay")) devices |= 0b00_11_0000; // Устоновка цветного режима экрана
+        if (args.Contains("terminal")) devices |= 0b0000000_1; // Устоновка терминала
+        if (args.Contains("digit")) devices |= 0b00000_01_0; // Устоновка беззнакового режима
+        if (args.Contains("digitsign")) devices |= 0b00000_11_0; // Устоновка знакового режима
+        fragment = [
+            $"ldi a,{devices}", // Сохраняем девайсы в регистер
+                    $"st a,{0x3E}" // Записываем в порт
+        ];
+        return fragment;
     }
 }
