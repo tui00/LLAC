@@ -23,17 +23,16 @@ public class LLAC(string file)
         string op = words[0];
         string[] args = words[1..];
 
-        string[] fragment = [];
-
         string label = $"_loopLLAC{nextLoopId++}";
+
+        string[] fragment;
         switch (op.ToLower())
         {
             // === Доп. команды ===
             case "readkey":
                 // 0x3E порт ввода
                 fragment = [
-                    $"{label}:", // Сохраняем метку
-                    $"ld {args[0]} 0x3E", // Считываем
+                    $"{label}:ld {args[0]} 0x3E", // Считываем
                     $"test {args[0]}", // Если ничего
                     $"jz {label}" // Переходим на метку
                 ];
