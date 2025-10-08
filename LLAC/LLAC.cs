@@ -53,13 +53,13 @@ public partial class LLAC(string file)
                 if (args.Contains("digitsign")) devices |= 0b00000_11_0; // Устоновка знакового режима
                 fragment = [
                     $"ldi a, {devices}", // Сохраняем девайсы в регистер
-                    "st a, 0x3E" // Записываем в порт
+                    "st a,0x3E" // Записываем в порт
                 ];
                 break;
             case "readkey" when args.Length == 1:
                 // 0x3E порт ввода
                 fragment = [
-                    $"{label}:ld {args[0]}, 0x3E", // Считываем
+                    $"{label}:ld {args[0]},0x3E", // Считываем
                     $"test {args[0]}", // Если ничего
                     $"jz {label}" // Переходим на метку
                 ];
