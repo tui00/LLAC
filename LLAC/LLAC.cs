@@ -36,16 +36,14 @@ public partial class LLAC(string file)
         string op = words[0];
         string[] args = [.. words[1..].Select(arg => arg.Trim(','))];
 
-        string label = $"_loopLLAC{nextLoopId}";
-
         string[] fragment;
         switch (op.ToLower())
         {
             // === Доп. команды ===
             case "connect" when args.Length > 0 && args.Length <= 5: fragment = Connect(args); break;
-            case "readchar" when args.Length == 1: fragment = ReadChar(args, label); break;
+            case "readchar" when args.Length == 1: fragment = ReadChar(args, GetLabel); break;
             case "writechar" when words[1..].Length != 0: fragment = WriteChar(string.Join(" ", words[1..])); break;
-            case "writeline" when words[1..].Length != 0: fragment = WriteLine(args, label); break;
+            case "writeline" when words[1..].Length != 0: fragment = WriteLine(args, GetLabel); break;
 
             // === Остальное ===
             default:
@@ -61,5 +59,10 @@ public partial class LLAC(string file)
         }
 
         return string.Join("\n", fragment);
+    }
+
+    private string GetLabel()
+    {
+        return $"_loopLLAC" + nextLoopId++;
     }
 }

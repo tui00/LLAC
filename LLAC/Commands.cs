@@ -19,25 +19,26 @@ public partial class LLAC
         return [$"st {arg},{0x3C}"];
     }
 
-    private static string[] WriteLine(string[] args, string label)
+    private static string[] WriteLine(string[] args, Func<string> label)
     {
+        string l = label();
+        string l2 = label();
         return [
             $"ldi b,{args[0]}", // Сохраняем в b адрес текста
-            $"ldi c,{args[1]}", // Сохраняем в c размер текста
             $"ldi d,{0x3C}", // Сохраняем в d адрес терминала
 
-            $"{label}:ld a,b", // Помещяем в a букву
+            $"{l}:ld a,b", // Помещяем в a букву
             $"st a,d", // Отправляем букву в терминал
             $"inc b", // Увеличиваем адрес буквы
-            $"dec c", // Уменьшаем счетчик длины оставшегося текста
-            $"jnz {label}", // Если счетчик не 0 повторяем
+            $"test a", // Проверяем на ноль
+            $"jnz {l}",
         ];
     }
 
-    private string[] ReadChar(string[] args, string label)
+    private string[] ReadChar(string[] args, Func<string> label)
     {
-        nextLoopId++;
-        return [$"{label}:ld {args[0]},{0x3E}", $"test {args[0]}", $"jz {label}"];
+        string l = label();
+        return [$"{l}:ld {args[0]},{0x3E}", $"test {args[0]}", $"jz {l}"];
     }
 
     private static string[] Connect(string[] args)
