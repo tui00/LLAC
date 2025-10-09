@@ -51,4 +51,11 @@ public partial class LLAC
         if (args.Contains("digitsign")) devices |= 0b00000_11_0; // Устоновка знакового режима
         return [$"ldi a,{devices}", $"st a,{0x3E}"];
     }
+
+    private static string[] String(string arg, string name)
+    {
+        return [
+            $"{name} db {arg},0"
+        ];
+    }
 }

@@ -44,6 +44,7 @@ public partial class LLAC(string file)
             case "readchar" when args.Length == 1: fragment = ReadChar(args, GetLabel); break;
             case "writechar" when words[1..].Length != 0: fragment = WriteChar(string.Join(" ", words[1..])); break;
             case "writeline" when words[1..].Length != 0: fragment = WriteLine(args, GetLabel); break;
+            case "string" when words[1..].Length != 0: fragment = String(string.Join(" ", words[2..]), words[1]); break;
 
             // === Остальное ===
             default:
