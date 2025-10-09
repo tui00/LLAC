@@ -15,7 +15,7 @@ public partial class LLAC(string file)
         if (nextCmdAddr <= 0x40 && preConnectedDevices != 0)
         {
             int voidToPortsCount = 0x3A - nextCmdAddr;
-            string voidToPorts = $"_voidLLAC db {string.Join(", ", Enumerable.Repeat("0", voidToPortsCount))}";
+            string voidToPorts = $"_voidLLAC db {string.Join(",", Enumerable.Repeat("0", voidToPortsCount))}";
             string jmpAndPorts = $"_portsLLAC db {string.Join(",", ["0", "0", "0", "0", $"{preConnectedDevices}", "0"])}";
 
             fragment = [.. fragment, voidToPortsCount != 0 ? voidToPorts : "", jmpAndPorts]; // Собираем все в месте
@@ -98,7 +98,7 @@ public partial class LLAC(string file)
             ];
 
             int voidToPortsCount = 0x38 - nextCmdAddr; // Сколько байт осталось до команды перехода
-            string voidToPorts = $"_voidLLAC db {string.Join(", ", Enumerable.Repeat("0", voidToPortsCount))}";
+            string voidToPorts = $"_voidLLAC db {string.Join(",", Enumerable.Repeat("0", voidToPortsCount))}";
             string jmpAndPorts = $"_portsLLAC db {0x03},{freeAddr},{string.Join(",", [.. ports, .. Enumerable.Repeat("0", freeAddr - 0x40)])}";
 
             fragment = [voidToPortsCount != 0 ? voidToPorts : "", jmpAndPorts, .. fragment]; // Собираем все в месте
