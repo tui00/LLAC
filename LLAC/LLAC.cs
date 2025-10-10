@@ -79,7 +79,7 @@ public partial class LLAC(string file)
         nextCmdAddr += GetLength(fragment);
 
         // === Перепрыгивание через порты ===
-        // 0xКонец портов -- Первый порт
+        // 0x40 -- Конец портов
         // 3 -- Код команды `jmp <адрес>`
         // 0x02 -- Размер команды `jmp <адрес>`
         // 0x38 = 0x3A - 0x02
