@@ -6,13 +6,14 @@ public partial class LLAC(string file)
 
     public int nextLabelId = 0;
     public int nextCmdAddr = 0;
+    public int connectedDevices = 0;
     public int preConnectedDevices = 0;
 
     public string Convert()
     {
         string[] fragment = [.. file.Split("\n").Select(ConvertLine)];
 
-        if (nextCmdAddr <= 0x40 && preConnectedDevices != 0)
+        if (nextCmdAddr <= 0x3A && preConnectedDevices != 0)
         {
             int voidToPortsCount = 0x3A - nextCmdAddr;
             string voidToPorts = $"_voidLLAC db {string.Join(",", Enumerable.Repeat("0", voidToPortsCount))}";
@@ -78,7 +79,8 @@ public partial class LLAC(string file)
         nextCmdAddr += GetLength(fragment);
 
         // === Перепрыгивание через порты ===
-        // 0x03 -- Код команды `jmp <адрес>`
+        // 0xКонец портов -- Первый порт
+        // 3 -- Код команды `jmp <адрес>`
         // 0x02 -- Размер команды `jmp <адрес>`
         // 0x38 = 0x3A - 0x02
 
@@ -91,17 +93,9 @@ public partial class LLAC(string file)
         {
             nextCmdAddr -= GetLength(fragment);
 
-            string[] ports = ["0", "0", // Цифровой индикатор
-                "0", "0", // Терминал
-                $"{preConnectedDevices}", // Подключеные устройства
-                "0" // Банк памяти
-            ];
+            string jmp = $"_jmpLLAC db {string.Join(",", [.. Enumerable.Repeat(0, 0x38 - nextCmdAddr), 3, freeAddr, 0, 0, 0, 0, preConnectedDevices, 0, .. Enumerable.Repeat(0, freeAddr - 0x40)])}";
 
-            int voidToPortsCount = 0x38 - nextCmdAddr; // Сколько байт осталось до команды перехода
-            string voidToPorts = $"_voidLLAC db {string.Join(",", Enumerable.Repeat("0", voidToPortsCount))}";
-            string jmpAndPorts = $"_portsLLAC db {0x03},{freeAddr},{string.Join(",", [.. ports, .. Enumerable.Repeat("0", freeAddr - 0x40)])}";
-
-            fragment = [voidToPortsCount != 0 ? voidToPorts : "", jmpAndPorts, .. fragment]; // Собираем все в месте
+            fragment = [jmp, .. fragment];
 
             nextCmdAddr += GetLength(fragment);
         }

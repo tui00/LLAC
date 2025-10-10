@@ -42,17 +42,19 @@ public partial class LLAC
 
     private string[] Connect(string[] args)
     {
-        return [$"ldi a,{GetDevices(args)}", $"st a,{0x3E}"];
+        connectedDevices = GetDevices(args);
+        return [$"ldi a,{connectedDevices}", $"st a,{0x3E}"];
     }
 
     private int GetDevices(string[] args)
     {
+        args = [.. args.SelectMany(a => a.Split(" ").Select(a => a.Trim(',')))];
         byte devices = 0;
-        if (args.Contains("display")) devices |= 0b00_01_0000; // Устоновка монохроного режима экрана
-        if (args.Contains("coldisplay")) devices |= 0b00_11_0000; // Устоновка цветного режима экрана
-        if (args.Contains("terminal")) devices |= 0b0000000_1; // Устоновка терминала
-        if (args.Contains("digit")) devices |= 0b0000_01_00; // Устоновка беззнакового режима
-        if (args.Contains("digitsign")) devices |= 0b0000_11_00; // Устоновка знакового режима
+        if (args.Contains("display")) devices |= 0b00010000; // Устоновка экрана
+        if (args.Contains("color")) devices |= 0b00100000; // Устоновка цветного режима экрана
+        if (args.Contains("terminal")) devices |= 0b00000001; // Устоновка терминала
+        if (args.Contains("counter")) devices |= 0b00000100; // Устоновка счетчика
+        if (args.Contains("signed")) devices |= 0b00001000; // Устоновка знакового режима счетчика
         return devices;
     }
 
