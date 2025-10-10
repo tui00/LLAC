@@ -1,3 +1,5 @@
+using System.Runtime.Versioning;
+
 namespace LLAC;
 
 public partial class LLAC(string file)
@@ -5,19 +7,21 @@ public partial class LLAC(string file)
     public readonly string file = file;
 
     public int nextLabelId = 0;
-    public int nextCmdAddr = 0;
-    public int connectedDevices = 0;
-    public int preConnectedDevices = 0;
+    public byte nextCmdAddr = 0;
+    public byte connectedDevices = 0;
+    public byte preConnectedDevices = 0;
+    public byte[] preImage = [];
 
+    [SupportedOSPlatform("windows")]
     public string Convert()
     {
         string[] fragment = [.. file.Split("\n").Select(ConvertLine)];
 
-        if (nextCmdAddr <= 0x3A && preConnectedDevices != 0)
+        if (nextCmdAddr <= 0x3A && (preConnectedDevices != 0 || preImage.Length != 0))
         {
             int voidToPortsCount = 0x3A - nextCmdAddr;
             string voidToPorts = $"_voidLLAC db {string.Join(",", Enumerable.Repeat("0", voidToPortsCount))}";
-            string jmpAndPorts = $"_portsLLAC db {string.Join(",", ["0", "0", "0", "0", $"{preConnectedDevices}", "0"])}";
+            string jmpAndPorts = $"_portsLLAC db {string.Join(",", [0, 0, 0, 0, preConnectedDevices, 0, .. preImage])}";
 
             fragment = [.. fragment, voidToPortsCount != 0 ? voidToPorts : "", jmpAndPorts]; // Собираем все в месте
         }
@@ -40,6 +44,7 @@ public partial class LLAC(string file)
         return line[..i].Trim(' ');
     }
 
+    [SupportedOSPlatform("windows")]
     public string ConvertLine(string line)
     {
         line = RemoveComments(line);
@@ -51,6 +56,10 @@ public partial class LLAC(string file)
         string[] args = [.. string.Join(" ", words[1..]).Split(',').Select(a => a.Trim())];
 
         string[] fragment = [line];
+
+        int displayActive = (preConnectedDevices & (1 << 4)) >> 4;
+        int displayColorsCount = (((preConnectedDevices & (1 << 5)) >> 5) + 1) * displayActive;
+
         switch (op.ToLower())
         {
             // === Команды ===
@@ -59,12 +68,18 @@ public partial class LLAC(string file)
             case "writechar" when words[1..].Length != 0: fragment = WriteChar(string.Join(" ", words[1..])); break;
             case "writeline" when words[1..].Length != 0: fragment = WriteLine(args, GetLabel); break;
             case "string" when words[1..].Length != 0: fragment = String(string.Join(" ", words[2..]), args[0]); break;
+            case "image" when args.Length == 1 && File.Exists(args[0]): fragment = [string.Join(",", GetImage(args[0]))]; break;
 
             default:
                 // === Полу-команды ===
                 if (op.Equals("@connect", StringComparison.CurrentCultureIgnoreCase) && args.Length > 0 && args.Length <= 5)
                 {
-                    preConnectedDevices = GetDevices(args);
+                    connectedDevices = preConnectedDevices = GetDevices(args);
+                    fragment = [];
+                }
+                if (op.Equals("@image", StringComparison.CurrentCultureIgnoreCase) && args.Length == 1 && File.Exists(args[0]))
+                {
+                    preImage = GetImage(args[0]);
                     fragment = [];
                 }
 
@@ -84,8 +99,6 @@ public partial class LLAC(string file)
         // 0x02 -- Размер команды `jmp <адрес>`
         // 0x38 = 0x3A - 0x02
 
-        int displayActive = (preConnectedDevices & (1 << 4)) >> 4;
-        int displayColorsCount = (((preConnectedDevices & (1 << 5)) >> 5) + 1) * displayActive;
         int freeAddr = 0x40;
         freeAddr += 0x20 * displayColorsCount; // 0x20 -- Размер буфера дисплея в одноцветном режиме
 
@@ -93,7 +106,17 @@ public partial class LLAC(string file)
         {
             nextCmdAddr -= GetLength(fragment);
 
-            string jmp = $"_jmpLLAC db {string.Join(",", [.. Enumerable.Repeat(0, 0x38 - nextCmdAddr), 3, freeAddr, 0, 0, 0, 0, preConnectedDevices, 0, .. Enumerable.Repeat(0, freeAddr - 0x40)])}";
+            string jmp = $"_jmpLLAC db {string.Join(",", [..
+                Enumerable.Repeat(0, 0x38 - nextCmdAddr), // Нули до адреса 0x38
+                3, freeAddr, // jmp на свободный адресс
+                0, // Порт для счетчика
+                0, // Порт для счетчика
+                0, // Порт для терминала
+                0, // Порт для терминала
+                preConnectedDevices, // 0x3E
+                0, // Выбор банка памяти
+                ..preImage // Видиопамять
+            ])}";
 
             fragment = [jmp, .. fragment];
 
@@ -108,9 +131,9 @@ public partial class LLAC(string file)
         return "_labelLLAC" + nextLabelId++;
     }
 
-    public static int GetLength(string[] fragment)
+    public static byte GetLength(string[] fragment)
     {
-        int length = 0;
+        byte length = 0;
 
         foreach (var line in fragment)
         {
@@ -119,6 +142,11 @@ public partial class LLAC(string file)
                 continue;
 
             string op = words[0];
+            if (op.Contains(':'))
+            {
+                op = op[(op.Index().First((e) => e.Item == ':').Index + 1)..];
+            }
+
             string[] args = [.. string.Join(" ", words[1..]).Split(',').Select(a => a.Trim())];
             int l = args.Length;
             bool arg1reg = args.Length > 0 && (args[0] is "a" or "b" or "c" or "d");
@@ -186,8 +214,9 @@ public partial class LLAC(string file)
                     string dbContent = string.Join(" ", words[1..]).Trim()[3..].Trim(); // удаляем "db"
                     bool inString = false;
 
-                    int count = 0;
+                    byte count = 0;
                     var numberBuffer = "";
+                    string stringBuffer = "";
 
                     for (int i = 0; i < dbContent.Length; i++)
                     {
@@ -196,6 +225,11 @@ public partial class LLAC(string file)
                         if (c == '"')
                         {
                             inString = !inString;
+                            if (!inString)
+                            {
+                                count += (byte)stringBuffer.Length;
+                                stringBuffer = "";
+                            }
                             continue;
                         }
 
@@ -205,7 +239,7 @@ public partial class LLAC(string file)
                             {
                                 i++;
                             }
-                            count++; // символ внутри строки
+                            stringBuffer += c;
                         }
                         else
                         {

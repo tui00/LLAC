@@ -1,3 +1,7 @@
+using System.Drawing;
+using System.Linq.Expressions;
+using System.Runtime.Versioning;
+
 namespace LLAC;
 
 public partial class LLAC
@@ -46,16 +50,75 @@ public partial class LLAC
         return [$"ldi a,{connectedDevices}", $"st a,{0x3E}"];
     }
 
-    private int GetDevices(string[] args)
+    private byte GetDevices(string[] args)
     {
         args = [.. args.SelectMany(a => a.Split(" ").Select(a => a.Trim(',')))];
         byte devices = 0;
-        if (args.Contains("display")) devices |= 0b00010000; // Устоновка экрана
-        if (args.Contains("color")) devices |= 0b00100000; // Устоновка цветного режима экрана
-        if (args.Contains("terminal")) devices |= 0b00000001; // Устоновка терминала
-        if (args.Contains("counter")) devices |= 0b00000100; // Устоновка счетчика
-        if (args.Contains("signed")) devices |= 0b00001000; // Устоновка знакового режима счетчика
+        if (args.Contains("display")) devices |= 1 << 4; // Устоновка экрана
+        if (args.Contains("color")) devices |= 1 << 5; // Устоновка цветного режима экрана
+        if (args.Contains("terminal")) devices |= 1 << 0; // Устоновка терминала
+        if (args.Contains("counter")) devices |= 1 << 2; // Устоновка счетчика
+        if (args.Contains("signed")) devices |= 1 << 3; // Устоновка знакового режима счетчика
         return devices;
+    }
+
+    [SupportedOSPlatform("windows")]
+    private byte[] GetImage(string path)
+    {
+        using var img = new Bitmap(path);
+        int width = img.Width;
+        int height = img.Height;
+
+        if (width != 16 || height != 16)
+            throw new ArgumentException("Изображение должно быть 16x16.");
+
+        var redBytes = new List<byte>();
+        var blueBytes = new List<byte>();
+
+        for (int y = 0; y < height; y++)
+        {
+            int redByte = 0;
+            int blueByte = 0;
+            int bitCount = 0;
+
+            for (int x = 0; x < width; x++)
+            {
+                var pixel = img.GetPixel(x, y);
+                int r = pixel.R;
+                int g = pixel.G;
+                int b = pixel.B;
+
+                int rBit = r > 127 ? 1 : 0;
+                int bBit = b > 127 ? 1 : 0;
+
+                if (g > 127)
+                {
+                    rBit = 0;
+                    bBit = 0;
+                }
+
+                redByte = (redByte << 1) | rBit;
+                blueByte = (blueByte << 1) | bBit;
+                bitCount++;
+
+                if (bitCount == 8)
+                {
+                    redBytes.Add((byte)redByte);
+                    blueBytes.Add((byte)blueByte);
+                    redByte = blueByte = 0;
+                    bitCount = 0;
+                }
+            }
+        }
+
+        var result = new List<byte>();
+        result.AddRange(redBytes);
+        if ((connectedDevices & 1 << 5) == 1 << 5) // Если доступен синий
+        {
+            result.AddRange(blueBytes);
+        }
+
+        return [.. result];
     }
 
     private static string[] String(string arg, string name)
