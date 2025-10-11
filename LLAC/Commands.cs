@@ -1,14 +1,13 @@
 using System.Drawing;
-using System.Linq.Expressions;
 using System.Runtime.Versioning;
 
 namespace LLAC;
 
 public partial class LLAC
 {
-    private static bool TryAlias(string op, string[] args, out string[] fragment)
+    private static bool TryAlias(Components components, out string[] fragment)
     {
-        switch (op)
+        switch (components.Op)
         {
             case "exit":
                 fragment = ["hlt"];
@@ -18,16 +17,16 @@ public partial class LLAC
         return false;
     }
 
-    private static string[] WriteChar(string arg)
+    private static string[] WriteChar(Components components)
     {
-        return [$"st {arg},{0x3C}"];
+        return [$"st {components.Args[0]},{0x3C}"];
     }
 
-    private static string[] WriteLine(string[] args, Func<string> label)
+    private static string[] WriteLine(Components components, Func<string> label)
     {
         string l = label();
         return [
-            $"ldi b,{args[0]}", // Сохраняем в b адрес текста
+            $"ldi b,{components.Args[0]}", // Сохраняем в b адрес текста
             $"ldi d,{0x3C}", // Сохраняем в d адрес терминала
 
             $"{l}:ld a,b", // Помещяем в a букву
@@ -38,34 +37,33 @@ public partial class LLAC
         ];
     }
 
-    private string[] ReadChar(string[] args, Func<string> label)
+    private string[] ReadChar(Components components, Func<string> label)
     {
         string l = label();
-        return [$"{l}:ld {args[0]},{0x3E}", $"test {args[0]}", $"jz {l}"];
+        return [$"{l}:ld {components.Args[0]},{0x3E}", $"test {components.Args[0]}", $"jz {l}"];
     }
 
-    private string[] Connect(string[] args)
+    private string[] Connect(Components components)
     {
-        connectedDevices = GetDevices(args);
+        connectedDevices = GetDevices(components.Args);
         return [$"ldi a,{connectedDevices}", $"st a,{0x3E}"];
     }
 
-    private byte GetDevices(string[] args)
+    private static byte GetDevices(string[] args)
     {
-        args = [.. args.SelectMany(a => a.Split(" ").Select(a => a.Trim(',')))];
         byte devices = 0;
-        if (args.Contains("display")) devices |= 1 << 4; // Устоновка экрана
-        if (args.Contains("color")) devices |= 1 << 5; // Устоновка цветного режима экрана
-        if (args.Contains("terminal")) devices |= 1 << 0; // Устоновка терминала
-        if (args.Contains("counter")) devices |= 1 << 2; // Устоновка счетчика
-        if (args.Contains("signed")) devices |= 1 << 3; // Устоновка знакового режима счетчика
+        if (args.Contains("disp")) devices |= 1 << 4; // Устоновка экрана
+        else if (args.Contains("coldisp")) devices |= 3 << 4; // Устоновка цветного режима экрана
+        if (args.Contains("term")) devices |= 1 << 0; // Устоновка терминала
+        if (args.Contains("digit")) devices |= 1 << 2; // Устоновка счетчика
+        else if (args.Contains("signdigit")) devices |= 3 << 2; // Устоновка знакового режима счетчика
         return devices;
     }
 
     [SupportedOSPlatform("windows")]
-    private byte[] GetImage(string path)
+    private byte[] GetImage(Components components)
     {
-        using var img = new Bitmap(path);
+        using var img = new Bitmap(components.Args[0]);
         int width = img.Width;
         int height = img.Height;
 
@@ -121,10 +119,10 @@ public partial class LLAC
         return [.. result];
     }
 
-    private static string[] String(string arg, string name)
+    private static string[] String(Components components)
     {
         return [
-            $"{name} db {arg},0"
+            $"{components.Args[0]}:db {string.Join(',', components.Args[1..])},0"
         ];
     }
 }

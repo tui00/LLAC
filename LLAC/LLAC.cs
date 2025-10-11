@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Runtime.Versioning;
 
 namespace LLAC;
@@ -47,44 +48,40 @@ public partial class LLAC(string file)
     [SupportedOSPlatform("windows")]
     public string ConvertLine(string line)
     {
-        line = RemoveComments(line);
-        string[] words = [.. line.Split(' ')];
-        if (words.Length == 0)
-            return "";
-
-        string op = words[0];
-        string[] args = [.. string.Join(" ", words[1..]).Split(',').Select(a => a.Trim())];
+        Components components = GetComponents(line);
 
         string[] fragment = [line];
 
         int displayActive = (preConnectedDevices & (1 << 4)) >> 4;
         int displayColorsCount = (((preConnectedDevices & (1 << 5)) >> 5) + 1) * displayActive;
 
-        switch (op.ToLower())
+        int argsCount = components.Args.Length;
+
+        switch (components.Op)
         {
             // === Команды ===
-            case "connect" when args.Length > 0 && args.Length <= 5: fragment = Connect(args); break;
-            case "readchar" when args.Length == 1: fragment = ReadChar(args, GetLabel); break;
-            case "writechar" when words[1..].Length != 0: fragment = WriteChar(string.Join(" ", words[1..])); break;
-            case "writeline" when words[1..].Length != 0: fragment = WriteLine(args, GetLabel); break;
-            case "string" when words[1..].Length != 0: fragment = String(string.Join(" ", words[2..]), args[0]); break;
-            case "image" when args.Length == 1 && File.Exists(args[0]): fragment = [string.Join(",", GetImage(args[0]))]; break;
+            case "connect" when argsCount > 0 && argsCount <= 3: fragment = Connect(components); break;
+            case "readchar" when argsCount == 1: fragment = ReadChar(components, GetLabel); break;
+            case "writechar" when argsCount == 1: fragment = WriteChar(components); break;
+            case "writeline" when argsCount == 1: fragment = WriteLine(components, GetLabel); break;
+            case "string" when argsCount == 2: fragment = String(components); break;
+            // case "image" when argsCount == 2 && File.Exists(components.args[0]): fragment = Image(components); break;
 
             default:
                 // === Полу-команды ===
-                if (op.Equals("@connect", StringComparison.CurrentCultureIgnoreCase) && args.Length > 0 && args.Length <= 5)
+                if (components.Op.Equals("@connect", StringComparison.CurrentCultureIgnoreCase) && argsCount > 0 && argsCount <= 3)
                 {
-                    connectedDevices = preConnectedDevices = GetDevices(args);
+                    connectedDevices = preConnectedDevices = GetDevices(components.Args);
                     fragment = [];
                 }
-                if (op.Equals("@image", StringComparison.CurrentCultureIgnoreCase) && args.Length == 1 && File.Exists(args[0]))
+                if (components.Op.Equals("@image", StringComparison.CurrentCultureIgnoreCase) && argsCount == 1 && File.Exists(components.Args[0]))
                 {
-                    preImage = GetImage(args[0]);
+                    preImage = GetImage(components);
                     fragment = [];
                 }
 
                 // === Остальное ===
-                if (TryAlias(op, args, out string[] aliasFragment))
+                if (TryAlias(components, out string[] aliasFragment))
                 {
                     fragment = aliasFragment;
                 }
@@ -106,7 +103,7 @@ public partial class LLAC(string file)
         {
             nextCmdAddr -= GetLength(fragment);
 
-            string jmp = $"_jmpLLAC db {string.Join(",", [..
+            string jmp = $"_jmpLLAC:db {string.Join(",", [..
                 Enumerable.Repeat(0, 0x38 - nextCmdAddr), // Нули до адреса 0x38
                 3, freeAddr, // jmp на свободный адресс
                 0, // Порт для счетчика
@@ -123,6 +120,15 @@ public partial class LLAC(string file)
             nextCmdAddr += GetLength(fragment);
         }
 
+        for (int i = 0; i < fragment.Length; i++)
+        {
+            components = GetComponents(fragment[i]);
+            if (components.Op == "db")
+            {
+                fragment[i] = $"{components.Label} db {string.Join(',', components.Args)}";
+            }
+        }
+
         return string.Join("\n", fragment);
     }
 
@@ -131,23 +137,56 @@ public partial class LLAC(string file)
         return "_labelLLAC" + nextLabelId++;
     }
 
+    private static Components GetComponents(string line)
+    {
+        string? label = null;
+        string op = "";
+        string[] args = [];
+
+        line = RemoveComments(line);
+
+        if (line.Split(' ')[0].Contains(':'))
+        {
+            int labelEnd = line.Index().First((e) => e.Item == ':').Index;
+            label = line[..labelEnd];
+            line = line[(labelEnd + 1)..].Trim();
+        }
+
+        op = line.Split(' ')[0].Trim();
+
+        string content = string.Join(' ', line.Split(' ')[1..]).Trim(); // Берем все после op
+        string curArg = ""; // Текущий аргумент, который составляется
+        bool inString = false; // Находится ли символ в строке
+        for (int i = 0; i < content.Length; i++)
+        {
+            char ch = content[i];
+            if (ch == '"') inString = !inString;
+            if (!inString && ch == ',')
+            {
+                args = [.. args, curArg.Trim()];
+                curArg = "";
+                continue;
+            }
+            curArg += ch;
+        }
+        if (curArg != "")
+            args = [.. args, curArg.Trim()];
+
+        return new(label, op, args);
+    }
+
     public static byte GetLength(string[] fragment)
     {
         byte length = 0;
 
         foreach (var line in fragment)
         {
-            string[] words = [.. line.Split(' ')];
-            if (words.Length == 0)
-                continue;
+            Components components = GetComponents(line);
 
-            string op = words[0];
-            if (op.Contains(':'))
-            {
-                op = op[(op.Index().First((e) => e.Item == ':').Index + 1)..];
-            }
+            string? label = components.Label;
+            string op = components.Op;
+            string[] args = components.Args;
 
-            string[] args = [.. string.Join(" ", words[1..]).Split(',').Select(a => a.Trim())];
             int l = args.Length;
             bool arg1reg = args.Length > 0 && (args[0] is "a" or "b" or "c" or "d");
             bool arg2reg = args.Length > 1 && (args[1] is "a" or "b" or "c" or "d");
@@ -203,72 +242,17 @@ public partial class LLAC(string file)
                 case "ldi":
                     length += 2;
                     break;
-            }
-            if (args.Length >= 1)
-            {
-                string firstArg = args[0].Split(' ')[0];
 
-                if (firstArg == "db")
-                {
-                    // Собираем все элементы после db
-                    string dbContent = string.Join(" ", words[1..]).Trim()[3..].Trim(); // удаляем "db"
-                    bool inString = false;
+                case "db":
+                    foreach (var arg in args)
+                        length += (byte)(arg.StartsWith('"') ? arg.Replace("\\", "").Length - 2 : 1);
 
-                    byte count = 0;
-                    var numberBuffer = "";
-                    string stringBuffer = "";
-
-                    for (int i = 0; i < dbContent.Length; i++)
-                    {
-                        char c = dbContent[i];
-
-                        if (c == '"')
-                        {
-                            inString = !inString;
-                            if (!inString)
-                            {
-                                count += (byte)stringBuffer.Length;
-                                stringBuffer = "";
-                            }
-                            continue;
-                        }
-
-                        if (inString)
-                        {
-                            if (c == '\\')
-                            {
-                                i++;
-                            }
-                            stringBuffer += c;
-                        }
-                        else
-                        {
-                            if (char.IsDigit(c) || c == '-' || c == '+')
-                            {
-                                numberBuffer += c;
-                            }
-                            else if (c == ',' || char.IsWhiteSpace(c))
-                            {
-                                if (!string.IsNullOrEmpty(numberBuffer))
-                                {
-                                    count++;
-                                    numberBuffer = "";
-                                }
-                            }
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(numberBuffer)) count++;
-
-                    length += count;
-                }
-                else if (firstArg is "equ" or "=")
-                {
-                    length += 0;
-                }
+                    break;
             }
         }
 
         return length;
     }
 }
+
+public record Components(string? Label, string Op, string[] Args);

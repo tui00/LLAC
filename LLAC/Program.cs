@@ -9,12 +9,6 @@ class Program
     [SupportedOSPlatform("windows")]
     static int Main(string[] args)
     {
-        // while (true)
-        // {
-            // string? code = Console.ReadLine();
-            // Console.WriteLine(LLAC.GetLength([code ?? ""]));
-        // }
-
 #if DEBUG
         if (args.Length == 0) args = ["file.llac", "file.asm"];
 #endif
