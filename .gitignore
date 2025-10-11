@@ -1,4 +1,5 @@
 .vscode
+.PVS-Studio
 **/obj
 **/bin
 publish.ps1
