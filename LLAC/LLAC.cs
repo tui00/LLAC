@@ -13,6 +13,16 @@ public partial class Llac(string file)
     private byte preConnectedDevices = 0;
     private byte[] preImage = [];
 
+    private int DisplayColorsCount
+    {
+        get
+        {
+            int displayActive = (preConnectedDevices & (1 << 4)) >> 4;
+            int displayColorsCount = (((preConnectedDevices & (1 << 5)) >> 5) + 1) * displayActive;
+            return displayColorsCount;
+        }
+    }
+
     [SupportedOSPlatform("windows")]
     public string Convert()
     {
@@ -59,11 +69,14 @@ public partial class Llac(string file)
         {
             // === Команды ===
             case "connect" when argsCount > 0 && argsCount <= 3: fragment = Connect(components); break;
-            case "readchar" when argsCount == 1: fragment = ReadChar(components, GetLabel); break;
+
+            case "readchar" when argsCount == 1: fragment = ReadChar(components); break;
             case "writechar" when argsCount == 1: fragment = WriteChar(components); break;
-            case "writeline" when argsCount == 1: fragment = WriteLine(components, GetLabel); break;
+            case "writeline" when argsCount == 1: fragment = WriteLine(components); break;
             case "string" when argsCount == 2: fragment = String(components); break;
-            case "drawimage" when argsCount == 1: fragment = DrawImage(components, GetLabel); break;
+
+            case "drawimage" when argsCount == 1: fragment = DrawImage(components); break;
+            case "cleardisp" when argsCount == 0: fragment = ClearDisplay(); break;
             case "image" when argsCount == 2 && File.Exists(components.Args[1]): fragment = Image(components); break;
 
             default:
@@ -110,11 +123,8 @@ public partial class Llac(string file)
         // 3 -- Код команды `jmp <адрес>`
         // 0x02 -- Размер команды `jmp <адрес>`
         // 0x38 = 0x3A - 0x02
-        int displayActive = (preConnectedDevices & (1 << 4)) >> 4;
-        int displayColorsCount = (((preConnectedDevices & (1 << 5)) >> 5) + 1) * displayActive;
-
         int freeAddr = 0x40;
-        freeAddr += 0x20 * displayColorsCount; // 0x20 -- Размер буфера дисплея в одноцветном режиме
+        freeAddr += 0x20 * DisplayColorsCount; // 0x20 -- Размер буфера дисплея в одноцветном режиме
 
         if (nextCmdAddr > 0x38 && nextCmdAddr < freeAddr) // Если мы в зоне портов
         {
@@ -129,7 +139,7 @@ public partial class Llac(string file)
                 0, // Порт для терминала
                 preConnectedDevices, // 0x3E
                 0, // Выбор банка памяти
-                ..(preImage.Length != 0 ? preImage : Enumerable.Repeat((byte)0, 0x20*displayColorsCount)) // Видиопамять
+                ..(preImage.Length != 0 ? preImage : Enumerable.Repeat((byte)0, 0x20 * DisplayColorsCount)) // Видиопамять
             ])}";
 
             fragment = [jmp, .. fragment];

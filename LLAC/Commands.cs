@@ -1,3 +1,4 @@
+using System.Collections.Specialized;
 using System.Drawing;
 using System.Runtime.Versioning;
 
@@ -22,41 +23,55 @@ public partial class Llac
         return [$"st {components.Args[0]},{0x3C}"];
     }
 
-    private static string[] WriteLine(Components components, Func<string> label)
+    private string[] WriteLine(Components components)
     {
-        string l = label();
+        string label = GetLabel();
         return [
             $"ldi b,{components.Args[0]}", // Сохраняем в b адрес текста
             $"ldi d,{0x3C}", // Сохраняем в d адрес терминала
 
-            $"{l}:ld a,b", // Помещяем в a букву
+            $"{label}:ld a,b", // Помещяем в a букву
             $"st a,d", // Отправляем букву в терминал
             $"inc b", // Увеличиваем адрес буквы
             $"test a", // Проверяем на ноль
-            $"jnz {l}",
+            $"jnz {label}",
         ];
     }
 
-    private static string[] ReadChar(Components components, Func<string> label)
+    private string[] ReadChar(Components components)
     {
-        string l = label();
-        return [$"{l}:ld {components.Args[0]},{0x3E}", $"test {components.Args[0]}", $"jz {l}"];
+        string label = GetLabel();
+        return [$"{label}:ld {components.Args[0]},{0x3E}", $"test {components.Args[0]}", $"jz {label}"];
     }
 
-    private static string[] DrawImage(Components components, Func<string> label)
+    private string[] DrawImage(Components components)
     {
-        string l = label();
+        string label = GetLabel();
         return [
             $"ldi b,{components.Args[0]}", // Сохраняем в b адрес изо
             $"ldi c,{components.Args[0]}_length", // Сохраняем длину
             $"ldi d,{0x40}", // Сохраняем в d адрес дисплея
 
-            $"{l}:ld a,b", // Считываем
+            $"{label}:ld a,b", // Считываем
             $"st a,d", // Записываем
             $"inc b", // Переходим к следущему адресу
             $"inc d",
             $"dec c",
-            $"jnz {l}" // Если для вывода еще что-то осталось, переходим
+            $"jnz {label}" // Если для вывода еще что-то осталось, переходим
+        ];
+    }
+
+    private string[] ClearDisplay()
+    {
+        string label = GetLabel();
+        return [
+            $"ldi a,0",
+            $"ldi d,{0x40}", // Сохраняем в d адрес дисплея
+            $"ldi c,{DisplayColorsCount * 0x20}",
+            $"{label}:st a,d", // Записываем
+            $"inc d",
+            $"dec c",
+            $"jnz {label}"
         ];
     }
 

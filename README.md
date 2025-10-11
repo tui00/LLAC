@@ -58,6 +58,8 @@ string hello, "Hello, World!"
 
 drawimage img ; Вывод изображения на экран
 
+cleardisp ; Очистка экрана
+
 exit
 
 image img, img.bmp ; Сохранение изображения в память
