@@ -43,6 +43,23 @@ public partial class LLAC
         return [$"{l}:ld {components.Args[0]},{0x3E}", $"test {components.Args[0]}", $"jz {l}"];
     }
 
+    private string[] DrawImage(Components components, Func<string> label)
+    {
+        string l = label();
+        return [
+            $"ldi b,{components.Args[0]}", // Сохраняем в b адрес изо
+            $"ldi c,{components.Args[0]}_length", // Сохраняем длину
+            $"ldi d,{0x40}", // Сохраняем в d адрес дисплея
+
+            $"{l}:ld a,b", // Считываем
+            $"st a,d", // Записываем
+            $"inc b", // Переходим к следущему адресу
+            $"inc d",
+            $"dec c",
+            $"jnz {l}" // Если для вывода еще что-то осталось, переходим
+        ];
+    }
+
     private string[] Connect(Components components)
     {
         connectedDevices = GetDevices(components.Args);
@@ -61,9 +78,9 @@ public partial class LLAC
     }
 
     [SupportedOSPlatform("windows")]
-    private byte[] GetImage(Components components)
+    private byte[] GetImage(string path)
     {
-        using var img = new Bitmap(components.Args[0]);
+        using var img = new Bitmap(path);
         int width = img.Width;
         int height = img.Height;
 
@@ -88,12 +105,6 @@ public partial class LLAC
 
                 int rBit = r > 127 ? 1 : 0;
                 int bBit = b > 127 ? 1 : 0;
-
-                if (g > 127)
-                {
-                    rBit = 0;
-                    bBit = 0;
-                }
 
                 redByte = (redByte << 1) | rBit;
                 blueByte = (blueByte << 1) | bBit;
@@ -123,6 +134,15 @@ public partial class LLAC
     {
         return [
             $"{components.Args[0]}:db {string.Join(',', components.Args[1..])},0"
+        ];
+    }
+
+    [SupportedOSPlatform("windows")]
+    private string[] Image(Components components)
+    {
+        return [
+            $"{components.Args[0]}:db {string.Join(',', GetImage(components.Args[1]))}",
+            $"{components.Args[0]}_length equ $-{components.Args[0]}"
         ];
     }
 }

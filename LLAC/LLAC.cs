@@ -1,4 +1,3 @@
-using System.Drawing;
 using System.Runtime.Versioning;
 
 namespace LLAC;
@@ -65,7 +64,8 @@ public partial class LLAC(string file)
             case "writechar" when argsCount == 1: fragment = WriteChar(components); break;
             case "writeline" when argsCount == 1: fragment = WriteLine(components, GetLabel); break;
             case "string" when argsCount == 2: fragment = String(components); break;
-            // case "image" when argsCount == 2 && File.Exists(components.args[0]): fragment = Image(components); break;
+            case "drawimage" when argsCount == 1: fragment = DrawImage(components, GetLabel); break;
+            case "image" when argsCount == 2 && File.Exists(components.Args[1]): fragment = Image(components); break;
 
             default:
                 // === Полу-команды ===
@@ -76,7 +76,7 @@ public partial class LLAC(string file)
                 }
                 if (components.Op.Equals("@image", StringComparison.CurrentCultureIgnoreCase) && argsCount == 1 && File.Exists(components.Args[0]))
                 {
-                    preImage = GetImage(components);
+                    preImage = GetImage(components.Args[0]);
                     fragment = [];
                 }
 
@@ -112,7 +112,7 @@ public partial class LLAC(string file)
                 0, // Порт для терминала
                 preConnectedDevices, // 0x3E
                 0, // Выбор банка памяти
-                ..preImage // Видиопамять
+                ..(preImage.Length != 0 ? preImage : Enumerable.Repeat((byte)0, 0x20*displayColorsCount)) // Видиопамять
             ])}";
 
             fragment = [jmp, .. fragment];
