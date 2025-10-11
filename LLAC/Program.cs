@@ -2,7 +2,7 @@
 
 namespace LLAC;
 
-class Program
+static class Program
 {
     internal static readonly string[] helpArgs = ["-h", "--help", "/?"];
 
@@ -25,7 +25,7 @@ class Program
 
         string path = args[0];
 
-        LLAC llac = new(File.ReadAllText(path).Replace("\r", ""));
+        Llac llac = new(File.ReadAllText(path).Replace("\r", ""));
         string output = llac.Convert();
         File.WriteAllText(args[1], output);
         return 0;

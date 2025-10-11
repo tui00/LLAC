@@ -1,16 +1,17 @@
 using System.Runtime.Versioning;
+using System.Text;
 
 namespace LLAC;
 
-public partial class LLAC(string file)
+public partial class Llac(string file)
 {
     public readonly string file = file;
 
-    public int nextLabelId = 0;
-    public byte nextCmdAddr = 0;
-    public byte connectedDevices = 0;
-    public byte preConnectedDevices = 0;
-    public byte[] preImage = [];
+    private int nextLabelId = 0;
+    private byte nextCmdAddr = 0;
+    private byte connectedDevices = 0;
+    private byte preConnectedDevices = 0;
+    private byte[] preImage = [];
 
     [SupportedOSPlatform("windows")]
     public string Convert()
@@ -32,13 +33,14 @@ public partial class LLAC(string file)
     private static string RemoveComments(string line)
     {
         bool inString = false;
-        int i;
-        for (i = 0; i < line.Length; i++)
+        int i = 0;
+        while (i < line.Length)
         {
             char ch = line[i];
             if (ch == '\\') i++;
             else if (ch == '"') inString = !inString;
             else if (ch == ';' && !inString) break;
+            i++;
         }
         if (i < 0) i = 0;
         return line[..i].Trim(' ');
@@ -50,9 +52,6 @@ public partial class LLAC(string file)
         Components components = GetComponents(line);
 
         string[] fragment = [line];
-
-        int displayActive = (preConnectedDevices & (1 << 4)) >> 4;
-        int displayColorsCount = (((preConnectedDevices & (1 << 5)) >> 5) + 1) * displayActive;
 
         int argsCount = components.Args.Length;
 
@@ -90,11 +89,29 @@ public partial class LLAC(string file)
 
         nextCmdAddr += GetLength(fragment);
 
+        fragment = JumpOverPorts(fragment);
+
+        for (int i = 0; i < fragment.Length; i++)
+        {
+            components = GetComponents(fragment[i]);
+            if (components.Op == "db")
+            {
+                fragment[i] = $"{components.Label} db {string.Join(',', components.Args)}";
+            }
+        }
+
+        return string.Join("\n", fragment);
+    }
+
+    private string[] JumpOverPorts(string[] fragment)
+    {
         // === Перепрыгивание через порты ===
         // 0x40 -- Конец портов
         // 3 -- Код команды `jmp <адрес>`
         // 0x02 -- Размер команды `jmp <адрес>`
         // 0x38 = 0x3A - 0x02
+        int displayActive = (preConnectedDevices & (1 << 4)) >> 4;
+        int displayColorsCount = (((preConnectedDevices & (1 << 5)) >> 5) + 1) * displayActive;
 
         int freeAddr = 0x40;
         freeAddr += 0x20 * displayColorsCount; // 0x20 -- Размер буфера дисплея в одноцветном режиме
@@ -120,16 +137,7 @@ public partial class LLAC(string file)
             nextCmdAddr += GetLength(fragment);
         }
 
-        for (int i = 0; i < fragment.Length; i++)
-        {
-            components = GetComponents(fragment[i]);
-            if (components.Op == "db")
-            {
-                fragment[i] = $"{components.Label} db {string.Join(',', components.Args)}";
-            }
-        }
-
-        return string.Join("\n", fragment);
+        return fragment;
     }
 
     private string GetLabel()
@@ -155,7 +163,7 @@ public partial class LLAC(string file)
         op = line.Split(' ')[0].Trim();
 
         string content = string.Join(' ', line.Split(' ')[1..]).Trim(); // Берем все после op
-        string curArg = ""; // Текущий аргумент, который составляется
+        StringBuilder curArg = new(); // Текущий аргумент, который составляется
         bool inString = false; // Находится ли символ в строке
         for (int i = 0; i < content.Length; i++)
         {
@@ -163,14 +171,14 @@ public partial class LLAC(string file)
             if (ch == '"') inString = !inString;
             if (!inString && ch == ',')
             {
-                args = [.. args, curArg.Trim()];
-                curArg = "";
+                args = [.. args, curArg.ToString().Trim()];
+                curArg.Clear();
                 continue;
             }
-            curArg += ch;
+            curArg.Append(ch);
         }
-        if (curArg != "")
-            args = [.. args, curArg.Trim()];
+        if (curArg.Length != 0)
+            args = [.. args, curArg.ToString().Trim()];
 
         return new(label, op, args);
     }
@@ -183,11 +191,9 @@ public partial class LLAC(string file)
         {
             Components components = GetComponents(line);
 
-            string? label = components.Label;
             string op = components.Op;
             string[] args = components.Args;
 
-            int l = args.Length;
             bool arg1reg = args.Length > 0 && (args[0] is "a" or "b" or "c" or "d");
             bool arg2reg = args.Length > 1 && (args[1] is "a" or "b" or "c" or "d");
             switch (op)

@@ -3,7 +3,7 @@ using System.Runtime.Versioning;
 
 namespace LLAC;
 
-public partial class LLAC
+public partial class Llac
 {
     private static bool TryAlias(Components components, out string[] fragment)
     {
@@ -37,13 +37,13 @@ public partial class LLAC
         ];
     }
 
-    private string[] ReadChar(Components components, Func<string> label)
+    private static string[] ReadChar(Components components, Func<string> label)
     {
         string l = label();
         return [$"{l}:ld {components.Args[0]},{0x3E}", $"test {components.Args[0]}", $"jz {l}"];
     }
 
-    private string[] DrawImage(Components components, Func<string> label)
+    private static string[] DrawImage(Components components, Func<string> label)
     {
         string l = label();
         return [
@@ -99,12 +99,9 @@ public partial class LLAC
             for (int x = 0; x < width; x++)
             {
                 var pixel = img.GetPixel(x, y);
-                int r = pixel.R;
-                int g = pixel.G;
-                int b = pixel.B;
 
-                int rBit = r > 127 ? 1 : 0;
-                int bBit = b > 127 ? 1 : 0;
+                int rBit = pixel.R > 127 ? 1 : 0;
+                int bBit = pixel.B > 127 ? 1 : 0;
 
                 redByte = (redByte << 1) | rBit;
                 blueByte = (blueByte << 1) | bBit;
