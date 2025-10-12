@@ -9,12 +9,18 @@ public partial class Llac
     private byte preConnectedDevices = 0;
     private byte[] preImage = [];
 
-    private static bool TryAlias(Components components, out string[] fragment)
+    [SupportedOSPlatform("windows")]
+    private bool TryAlias(Components components, out string[] fragment)
     {
         switch (components.Op)
         {
-            case "exit":
-                fragment = ["hlt"];
+            case "exit": fragment = ["hlt"]; return true;
+            case "string": fragment = [$"{components.Args[0]}:db {string.Join(',', components.Args[1..])},0"]; return true;
+            case "image":
+                fragment = [
+                    $"{components.Args[0]}:db {string.Join(',', GetImage(components.Args[1], (connectedDevices & 1 << 5) == 1 << 5))}",
+                    $"{components.Args[0]}_length equ $-{components.Args[0]}"
+                ];
                 return true;
         }
         fragment = [];
@@ -178,22 +184,5 @@ public partial class Llac
         }
 
         return useBlue ? [.. redBytes, .. blueBytes] : redBytes;
-    }
-
-    // === Вспомогательные
-    private static string[] String(Components components)
-    {
-        return [
-            $"{components.Args[0]}:db {string.Join(',', components.Args[1..])},0"
-        ];
-    }
-
-    [SupportedOSPlatform("windows")]
-    private string[] Image(Components components)
-    {
-        return [
-            $"{components.Args[0]}:db {string.Join(',', GetImage(components.Args[1], (connectedDevices & 1 << 5) == 1 << 5))}",
-            $"{components.Args[0]}_length equ $-{components.Args[0]}"
-        ];
     }
 }

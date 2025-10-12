@@ -74,11 +74,9 @@ public partial class Llac(string file)
             case "readchar" when argsCount == 1: fragment = ReadChar(components); break;
             case "writechar" when argsCount == 1: fragment = WriteChar(components); break;
             case "writeline" when argsCount == 1: fragment = WriteLine(components); break;
-            case "string" when argsCount == 2: fragment = String(components); break;
 
             case "drawimage" when argsCount == 1: fragment = DrawImage(components); break;
             case "cleardisp" when argsCount == 0: fragment = ClearDisplay(); break;
-            case "image" when argsCount == 2 && File.Exists(components.Args[1]): fragment = Image(components); break;
 
             case "prepare" when argsCount == 2: fragment = PrepareNum(components); break;
             case "writenum" when argsCount == 1: fragment = SetDigit(components); break;
@@ -88,7 +86,7 @@ public partial class Llac(string file)
                 // === Полу-команды ===
                 if (TryHalfCommand(components, out string[] halfCommandFragment)) fragment = halfCommandFragment;
 
-                // === Остальное ===
+                // === Алиасы ===
                 if (TryAlias(components, out string[] aliasFragment)) fragment = aliasFragment;
                 break;
         }
