@@ -9,16 +9,13 @@ public partial class Llac(string file)
 
     private int nextLabelId = 0;
     private byte nextCmdAddr = 0;
-    private byte connectedDevices = 0;
-    private byte preConnectedDevices = 0;
-    private byte[] preImage = [];
 
-    private int DisplayColorsCount
+    private byte DisplayColorsCount
     {
         get
         {
-            int displayActive = (preConnectedDevices & (1 << 4)) >> 4;
-            int displayColorsCount = (((preConnectedDevices & (1 << 5)) >> 5) + 1) * displayActive;
+            byte displayActive = (byte)((preConnectedDevices & 1 << 4) >> 4);
+            byte displayColorsCount = (byte)((((preConnectedDevices & (1 << 5)) >> 5) + 1) * displayActive);
             return displayColorsCount;
         }
     }
@@ -26,18 +23,22 @@ public partial class Llac(string file)
     [SupportedOSPlatform("windows")]
     public string Convert()
     {
-        string[] fragment = [.. file.Split("\n").Select(ConvertLine)];
+        string[] codeLines = [.. file.Split("\n").Select(ConvertLine)];
 
-        if (nextCmdAddr <= 0x3A && (preConnectedDevices != 0 || preImage.Length != 0))
+        if (nextCmdAddr <= 0x3A && (preConnectedDevices != 0))
         {
-            int voidToPortsCount = 0x3A - nextCmdAddr;
-            string voidToPorts = $"_voidLLAC db {string.Join(",", Enumerable.Repeat("0", voidToPortsCount))}";
-            string jmpAndPorts = $"_portsLLAC db {string.Join(",", [0, 0, 0, 0, preConnectedDevices, 0, .. preImage])}";
-
-            fragment = [.. fragment, voidToPortsCount != 0 ? voidToPorts : "", jmpAndPorts]; // Собираем все в месте
+            codeLines = [.. codeLines, JumpOverPorts()];
+        }
+        for (int i = 0; i < codeLines.Length; i++)
+        {
+            Components components = GetComponents(codeLines[i]);
+            if (components.Op == "db")
+            {
+                codeLines[i] = $"{components.Label} db {string.Join(',', components.Args)}";
+            }
         }
 
-        return string.Join("\n", fragment).Replace("\n\n", "\n").Trim();
+        return string.Join("\n", codeLines).Replace("\n\n", "\n").Trim();
     }
 
     private static string RemoveComments(string line)
@@ -79,6 +80,10 @@ public partial class Llac(string file)
             case "cleardisp" when argsCount == 0: fragment = ClearDisplay(); break;
             case "image" when argsCount == 2 && File.Exists(components.Args[1]): fragment = Image(components); break;
 
+            case "prepare" when argsCount == 2: fragment = PrepareNum(components); break;
+            case "writenum" when argsCount == 1: fragment = SetDigit(components); break;
+            case "cleardigit" when argsCount == 0: fragment = ["ldi a,0",$"st a,{0x3A}",$"st a,{0x3B}"]; break;
+
             default:
                 // === Полу-команды ===
                 if (components.Op.Equals("@connect", StringComparison.CurrentCultureIgnoreCase) && argsCount > 0 && argsCount <= 3)
@@ -88,7 +93,10 @@ public partial class Llac(string file)
                 }
                 if (components.Op.Equals("@image", StringComparison.CurrentCultureIgnoreCase) && argsCount == 1 && File.Exists(components.Args[0]))
                 {
-                    preImage = GetImage(components.Args[0]);
+                    var (image, useBlue) = GetImage(components.Args[0], false, true);
+                    preConnectedDevices = (byte)(preConnectedDevices | ((useBlue ? 3 : 1) << 4));
+                    connectedDevices = preConnectedDevices;
+                    preImage = image;
                     fragment = [];
                 }
 
@@ -102,52 +110,34 @@ public partial class Llac(string file)
 
         nextCmdAddr += GetLength(fragment);
 
-        fragment = JumpOverPorts(fragment);
+        byte freeAddr = (byte)(0x40 + 0x20 * DisplayColorsCount);
 
-        for (int i = 0; i < fragment.Length; i++)
+        if (nextCmdAddr > 0x38 && nextCmdAddr < freeAddr)
         {
-            components = GetComponents(fragment[i]);
-            if (components.Op == "db")
-            {
-                fragment[i] = $"{components.Label} db {string.Join(',', components.Args)}";
-            }
+            nextCmdAddr -= GetLength(fragment);
+            fragment = [JumpOverPorts([3, freeAddr]), .. fragment];
+            nextCmdAddr += GetLength(fragment);
         }
 
         return string.Join("\n", fragment);
     }
 
-    private string[] JumpOverPorts(string[] fragment)
+    private string JumpOverPorts(byte[]? additionalCode = null)
     {
-        // === Перепрыгивание через порты ===
-        // 0x40 -- Конец портов
-        // 3 -- Код команды `jmp <адрес>`
-        // 0x02 -- Размер команды `jmp <адрес>`
-        // 0x38 = 0x3A - 0x02
-        int freeAddr = 0x40;
-        freeAddr += 0x20 * DisplayColorsCount; // 0x20 -- Размер буфера дисплея в одноцветном режиме
-
-        if (nextCmdAddr > 0x38 && nextCmdAddr < freeAddr) // Если мы в зоне портов
-        {
-            nextCmdAddr -= GetLength(fragment);
-
-            string jmp = $"_jmpLLAC:db {string.Join(",", [..
-                Enumerable.Repeat(0, 0x38 - nextCmdAddr), // Нули до адреса 0x38
-                3, freeAddr, // jmp на свободный адресс
-                0, // Порт для счетчика
-                0, // Порт для счетчика
-                0, // Порт для терминала
-                0, // Порт для терминала
-                preConnectedDevices, // 0x3E
+        additionalCode ??= [];
+        string jmp = $"{GetLabel()}:db {string.Join(",", [
+                .. Enumerable.Repeat(0, 0x3A - additionalCode.Length - nextCmdAddr), // Нули
+                .. additionalCode, // Дополнительный код
+                0, // Порт для счетчика 1
+                0, // Порт для счетчика 2
+                0, // Порт для терминала 1
+                0, // Порт для терминала 2
+                preConnectedDevices, // Подключеные устройства
                 0, // Выбор банка памяти
                 ..(preImage.Length != 0 ? preImage : Enumerable.Repeat((byte)0, 0x20 * DisplayColorsCount)) // Видиопамять
-            ])}";
+        ])}";
 
-            fragment = [jmp, .. fragment];
-
-            nextCmdAddr += GetLength(fragment);
-        }
-
-        return fragment;
+        return jmp;
     }
 
     private string GetLabel()

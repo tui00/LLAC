@@ -1,4 +1,3 @@
-using System.Collections.Specialized;
 using System.Drawing;
 using System.Runtime.Versioning;
 
@@ -6,6 +5,10 @@ namespace LLAC;
 
 public partial class Llac
 {
+    private byte connectedDevices = 0;
+    private byte preConnectedDevices = 0;
+    private byte[] preImage = [];
+
     private static bool TryAlias(Components components, out string[] fragment)
     {
         switch (components.Op)
@@ -18,6 +21,7 @@ public partial class Llac
         return false;
     }
 
+    // === Терминал ===
     private static string[] WriteChar(Components components)
     {
         return [$"st {components.Args[0]},{0x3C}"];
@@ -38,12 +42,14 @@ public partial class Llac
         ];
     }
 
+    // === Клавиатура ===
     private string[] ReadChar(Components components)
     {
         string label = GetLabel();
         return [$"{label}:ld {components.Args[0]},{0x3E}", $"test {components.Args[0]}", $"jz {label}"];
     }
 
+    // === Дисплей ===
     private string[] DrawImage(Components components)
     {
         string label = GetLabel();
@@ -75,10 +81,40 @@ public partial class Llac
         ];
     }
 
+    // === Счетчик ===
+    private static string[] SetDigit(Components components)
+    {
+        string arg = components.Args[0];
+        string[] fragment = [];
+        string upperReg = arg.Length == 3 ? arg.Split(':')[0] : "";
+        string lowerReg = arg.Split(':')[arg.Length == 3 ? 1 : 0];
+        if (upperReg != "")
+            fragment = [.. fragment, $"st {upperReg},{0x3B}"];
+        fragment = [.. fragment, $"st {lowerReg},{0x3A}"];
+        return fragment;
+    }
+
+    private static string[] PrepareNum(Components components)
+    {
+        string arg = components.Args[1].Trim();
+        ushort baseValue = components.Args[0] switch
+        {
+            var s when s.Length == 3 && s.StartsWith('"') => s[1],
+            var s when s.StartsWith("0x", StringComparison.OrdinalIgnoreCase) => System.Convert.ToUInt16(s[2..], 16),
+            var s when s.StartsWith("0b", StringComparison.OrdinalIgnoreCase) => System.Convert.ToUInt16(s[2..], 2),
+            var s when s.StartsWith('0') && s.Length > 1 => System.Convert.ToUInt16(s[1..], 8),
+            var s when s.StartsWith('-') => (ushort)short.Parse(s),
+            var s => ushort.Parse(s)
+        };
+        return [$"ldi {arg.Split(':')[1]},{baseValue & 0xFF}", $"ldi {arg.Split(':')[0]},{baseValue >> 8}"];
+    }
+
+    // === Подключение устройств ===
     private string[] Connect(Components components)
     {
-        connectedDevices = GetDevices(components.Args);
-        return [$"ldi a,{connectedDevices}", $"st a,{0x3E}"];
+        byte devices = GetDevices(components.Args);
+        connectedDevices = devices;
+        return [$"ldi a,{devices}", $"st a,{0x3E}"];
     }
 
     private static byte GetDevices(string[] args)
@@ -92,26 +128,22 @@ public partial class Llac
         return devices;
     }
 
+    // === Утилиты ===
     [SupportedOSPlatform("windows")]
-    private byte[] GetImage(string path)
+    private (byte[] image, bool useBlue) GetImage(string path, bool useBlue, bool autoDetectUseBlue = false)
     {
         using var img = new Bitmap(path);
-        int width = img.Width;
-        int height = img.Height;
-
-        if (width != 16 || height != 16)
-            throw new ArgumentException("Изображение должно быть 16x16.");
 
         var redBytes = new List<byte>();
         var blueBytes = new List<byte>();
 
-        for (int y = 0; y < height; y++)
+        for (int y = 0; y < 16; y++)
         {
             int redByte = 0;
             int blueByte = 0;
             int bitCount = 0;
 
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < 16; x++)
             {
                 var pixel = img.GetPixel(x, y);
 
@@ -134,14 +166,16 @@ public partial class Llac
 
         var result = new List<byte>();
         result.AddRange(redBytes);
-        if ((connectedDevices & 1 << 5) == 1 << 5) // Если доступен синий
+        useBlue |= autoDetectUseBlue && blueBytes.Any(b => b != 0);
+        if (useBlue)
         {
             result.AddRange(blueBytes);
         }
 
-        return [.. result];
+        return ([.. result], useBlue);
     }
 
+    // === Вспомогательные
     private static string[] String(Components components)
     {
         return [
@@ -153,7 +187,7 @@ public partial class Llac
     private string[] Image(Components components)
     {
         return [
-            $"{components.Args[0]}:db {string.Join(',', GetImage(components.Args[1]))}",
+            $"{components.Args[0]}:db {string.Join(',', GetImage(components.Args[1], (connectedDevices & 1 << 5) == 1 << 5).image)}",
             $"{components.Args[0]}_length equ $-{components.Args[0]}"
         ];
     }
