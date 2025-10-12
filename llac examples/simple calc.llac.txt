@@ -1,0 +1,32 @@
+@connect digit ; подключаем цифровой индикатор
+
+; Простой калькулятор: <digit><op><digit>
+; Поддерживает только + и - ; цифры 0..9 (ввод по одному символу)
+
+ldi c, 0 ; регистер для результата
+cleardigit
+
+start:
+    ; --- читаем первую цифру ---
+    readchar c
+    ldi b, "0"
+    sub c, b
+    ; --- читаем оператор ---
+    readchar d
+    ldi b, "+" 
+    sub d, b
+    ; --- читаем вторую цифру ---
+    readchar a
+    ldi b, "0"
+    sub a, b
+
+    test d
+    jnz do_sub ; если не + вычитаем
+do_add:
+    add c, a
+    jmp end
+do_sub:
+    sub c, a
+end:
+    writenum c
+    jmp start
