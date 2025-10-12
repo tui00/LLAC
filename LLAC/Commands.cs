@@ -1,6 +1,5 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using System.Runtime.Versioning;
 
 namespace LLAC;
 
@@ -10,7 +9,6 @@ public partial class Llac
     private byte preConnectedDevices = 0;
     private byte[] preImage = [];
 
-    [SupportedOSPlatform("windows")]
     private bool TryAlias(Components components, out string[] fragment)
     {
         switch (components.Op)
@@ -28,7 +26,6 @@ public partial class Llac
         return false;
     }
 
-    [SupportedOSPlatform("windows")]
     private bool TryHalfCommand(Components components, out string[] fragment)
     {
         fragment = [];

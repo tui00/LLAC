@@ -1,4 +1,3 @@
-using System.Runtime.Versioning;
 using System.Text;
 
 namespace LLAC;
@@ -20,7 +19,6 @@ public partial class Llac(string file)
         }
     }
 
-    [SupportedOSPlatform("windows")]
     public string Convert()
     {
         string[] codeLines = [.. file.Split("\n").Select(ConvertLine)];
@@ -57,7 +55,6 @@ public partial class Llac(string file)
         return line[..i].Trim(' ');
     }
 
-    [SupportedOSPlatform("windows")]
     public string ConvertLine(string line)
     {
         Components components = GetComponents(line);

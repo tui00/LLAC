@@ -1,12 +1,9 @@
-﻿using System.Runtime.Versioning;
-
-namespace LLAC;
+﻿namespace LLAC;
 
 static class Program
 {
     internal static readonly string[] helpArgs = ["-h", "--help", "/?"];
 
-    [SupportedOSPlatform("windows")]
     static int Main(string[] args)
     {
 #if DEBUG
