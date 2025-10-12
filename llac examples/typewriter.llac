@@ -1,0 +1,6 @@
+@connect term ; Подключаем терминал для вывода
+; === Програма ===
+loop:
+    readchar a ; Считываем символ
+    writechar a ; Выводим символ
+    jmp loop
