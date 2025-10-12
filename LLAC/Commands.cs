@@ -21,6 +21,23 @@ public partial class Llac
         return false;
     }
 
+    [SupportedOSPlatform("windows")]
+    private bool TryHalfCommand(Components components, out string[] fragment)
+    {
+        fragment = [];
+        int argsCount = components.Args.Length;
+        switch (components.Op.ToLowerInvariant())
+        {
+            case "@connect" when argsCount > 0 && argsCount <= 3:
+                connectedDevices = preConnectedDevices = GetDevices(components.Args);
+                return true;
+            case "@image" when argsCount == 1 && File.Exists(components.Args[0]):
+                preImage = GetImage(components.Args[0], ((connectedDevices >> 5) & 1) == 1);
+                return true;
+        }
+        return false;
+    }
+
     // === Терминал ===
     private static string[] WriteChar(Components components)
     {
@@ -130,49 +147,37 @@ public partial class Llac
 
     // === Утилиты ===
     [SupportedOSPlatform("windows")]
-    private (byte[] image, bool useBlue) GetImage(string path, bool useBlue, bool autoDetectUseBlue = false)
+    private static byte[] GetImage(string path, bool useBlue)
     {
         using var img = new Bitmap(path);
 
-        var redBytes = new List<byte>();
-        var blueBytes = new List<byte>();
+        var redBytes = new byte[32];
+        var blueBytes = new byte[32];
+        int byteIndex = 0;
 
+        int redByte = 0, blueByte = 0;
         for (int y = 0; y < 16; y++)
         {
-            int redByte = 0;
-            int blueByte = 0;
-            int bitCount = 0;
-
             for (int x = 0; x < 16; x++)
             {
                 var pixel = img.GetPixel(x, y);
-
                 int rBit = pixel.R > 127 ? 1 : 0;
                 int bBit = pixel.B > 127 ? 1 : 0;
 
-                redByte = (redByte << 1) | rBit;
+                redByte = (redByte << 1) | rBit | (useBlue ? 0 : bBit);
                 blueByte = (blueByte << 1) | bBit;
-                bitCount++;
 
-                if (bitCount == 8)
+                if ((x + 1) % 8 == 0)
                 {
-                    redBytes.Add((byte)redByte);
-                    blueBytes.Add((byte)blueByte);
+                    redBytes[byteIndex] = (byte)redByte;
+                    blueBytes[byteIndex] = (byte)blueByte;
+                    byteIndex++;
                     redByte = blueByte = 0;
-                    bitCount = 0;
                 }
             }
         }
 
-        var result = new List<byte>();
-        result.AddRange(redBytes);
-        useBlue |= autoDetectUseBlue && blueBytes.Any(b => b != 0);
-        if (useBlue)
-        {
-            result.AddRange(blueBytes);
-        }
-
-        return ([.. result], useBlue);
+        return useBlue ? [.. redBytes, .. blueBytes] : redBytes;
     }
 
     // === Вспомогательные
@@ -187,7 +192,7 @@ public partial class Llac
     private string[] Image(Components components)
     {
         return [
-            $"{components.Args[0]}:db {string.Join(',', GetImage(components.Args[1], (connectedDevices & 1 << 5) == 1 << 5).image)}",
+            $"{components.Args[0]}:db {string.Join(',', GetImage(components.Args[1], (connectedDevices & 1 << 5) == 1 << 5))}",
             $"{components.Args[0]}_length equ $-{components.Args[0]}"
         ];
     }

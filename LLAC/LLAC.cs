@@ -82,29 +82,14 @@ public partial class Llac(string file)
 
             case "prepare" when argsCount == 2: fragment = PrepareNum(components); break;
             case "writenum" when argsCount == 1: fragment = SetDigit(components); break;
-            case "cleardigit" when argsCount == 0: fragment = ["ldi a,0",$"st a,{0x3A}",$"st a,{0x3B}"]; break;
+            case "cleardigit" when argsCount == 0: fragment = ["ldi a,0", $"st a,{0x3A}", $"st a,{0x3B}"]; break;
 
             default:
                 // === Полу-команды ===
-                if (components.Op.Equals("@connect", StringComparison.CurrentCultureIgnoreCase) && argsCount > 0 && argsCount <= 3)
-                {
-                    connectedDevices = preConnectedDevices = GetDevices(components.Args);
-                    fragment = [];
-                }
-                if (components.Op.Equals("@image", StringComparison.CurrentCultureIgnoreCase) && argsCount == 1 && File.Exists(components.Args[0]))
-                {
-                    var (image, useBlue) = GetImage(components.Args[0], false, true);
-                    preConnectedDevices = (byte)(preConnectedDevices | ((useBlue ? 3 : 1) << 4));
-                    connectedDevices = preConnectedDevices;
-                    preImage = image;
-                    fragment = [];
-                }
+                if (TryHalfCommand(components, out string[] halfCommandFragment)) fragment = halfCommandFragment;
 
                 // === Остальное ===
-                if (TryAlias(components, out string[] aliasFragment))
-                {
-                    fragment = aliasFragment;
-                }
+                if (TryAlias(components, out string[] aliasFragment)) fragment = aliasFragment;
                 break;
         }
 
@@ -180,7 +165,7 @@ public partial class Llac(string file)
         if (curArg.Length != 0)
             args = [.. args, curArg.ToString().Trim()];
 
-        return new(label, op, args);
+        return new(label, op.ToLower(), args);
     }
 
     public static byte GetLength(string[] fragment)
