@@ -1,4 +1,5 @@
-using System.Drawing;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using System.Runtime.Versioning;
 
 namespace LLAC;
@@ -152,37 +153,34 @@ public partial class Llac
     }
 
     // === Утилиты ===
-    [SupportedOSPlatform("windows")]
     private static byte[] GetImage(string path, bool useBlue)
     {
-        using var img = new Bitmap(path);
+        using var img = Image.Load<Rgba32>(path);
 
-        var redBytes = new byte[32];
-        var blueBytes = new byte[32];
-        int byteIndex = 0;
+        var redBytes = new List<byte>();
+        var blueBytes = new List<byte>();
 
         int redByte = 0, blueByte = 0;
         for (int y = 0; y < 16; y++)
         {
             for (int x = 0; x < 16; x++)
             {
-                var pixel = img.GetPixel(x, y);
-                int rBit = pixel.R > 127 ? 1 : 0;
-                int bBit = pixel.B > 127 ? 1 : 0;
+                var pixel = img[x, y];
+                int rBit = pixel.R >> 7;
+                int bBit = pixel.B >> 7;
 
-                redByte = (redByte << 1) | rBit | (useBlue ? 0 : bBit);
-                blueByte = (blueByte << 1) | bBit;
+                redByte |= (rBit | (useBlue ? 0 : bBit)) << (7 - x % 8);
+                blueByte |= bBit << (7 - x % 8);
 
                 if ((x + 1) % 8 == 0)
                 {
-                    redBytes[byteIndex] = (byte)redByte;
-                    blueBytes[byteIndex] = (byte)blueByte;
-                    byteIndex++;
+                    redBytes.Add((byte)redByte);
+                    blueBytes.Add((byte)blueByte);
                     redByte = blueByte = 0;
                 }
             }
         }
 
-        return useBlue ? [.. redBytes, .. blueBytes] : redBytes;
+        return useBlue ? redBytes.Concat(blueBytes).ToArray() : redBytes.ToArray();
     }
 }
