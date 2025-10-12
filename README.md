@@ -1,16 +1,19 @@
 # LLAC
 [![Computer](https://img.shields.io/badge/logic--arrows-map-blue)](https://logic-arrows.io/map-computer)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/tui00/LLAC/dotnet.yml)
-[![GitHub License](https://img.shields.io/github/license/tui00/LLAC)](https://github.com/tui00/LLAC/blob/main/LICENSE)
-![GitHub Release](https://img.shields.io/github/v/release/tui00/LLAC?include_prereleases)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/tui00/LLAC/dotnet.yml)](https://github.com/tui00/LLAC/actions/workflows/dotnet.yml)
+[![License](https://img.shields.io/github/license/tui00/LLAC)](https://github.com/tui00/LLAC/blob/main/LICENSE)
+[![Last release version](https://img.shields.io/github/v/release/tui00/LLAC?include_prereleases)](https://github.com/tui00/LLAC/releases)
+[![Static Badge](https://img.shields.io/badge/English-README-red)](https://github-com.translate.goog/tui00/LLAC/blob/main/README.md?_x_tr_sl=ru&_x_tr_tl=en&_x_tr_hl=ru&_x_tr_pto=wapp)
 
 ### Краткое описание
 Это мини-преобразователь простых команд в сложные конструкции для asembler-а [компьютера](https://logic-arrows.io/map-computer) **второй версии** из игры [logic-arrows](https://logic-arrows/)
 
 ## Скачивание проекта
+> **⚠️ Этими способами вы можете скачать только `Debug` версию. Если нужна `Release` версия, перейдите во вкладку [`Releases`](https://github.com/tui00/LLAC/releases)**
 - С помощью workflow:  
   - Откройте вкладку `Actions`
   - Выбирете `.NET`
+  - Выбирете последний запуск
   - Пролистайте вниз
   - Скачайте нужную версию
 - С помощью ссылки:
@@ -60,12 +63,18 @@ exit
 
 image img, img.bmp
 ```
-Еще вы можете вывести изображение на дисплей во время загрузки дискеты
+Вы также можете вывести изображение на дисплей во время загрузки дискеты
 ```asm
 @connect coldisp ; Выжно использовать @connect, а не connect
 @image preRunImage.bmp
 ```
-Изображение должно быть в формате bmp размером 16 на 16 и содержать только эти цвета(в формате 0xRRGGBBAA): 0xFF000000, 0x0000FF00, 0xFF00FF00, 0x00000000.
+Желательно что-бы изображение:
+1. было 16x16 пикселей
+2. в формате bmp
+3. не содержало зеленого компонента(он просто [не подерживается](https://github.com/chubrik/LogicArrows/blob/main/computer-v2/specification.md#дисплей))
+4. содержало альфа канал(можно просто заполнить не использованое пространство черным)
+
+Но все это кроме 3 можно не соблюдать
 
 ### Счетчик
 ```asm
@@ -78,7 +87,7 @@ cleardigit ; Очищяем, изменяет a
 ```
 
 ### Другое
-Вы можете загрузить в порт для выбора устройств(0x3E) значение
+Вы можете загрузить в [порт для выбора устройств(0x3E)](https://github.com/chubrik/LogicArrows/blob/main/computer-v2/specification.md#оперативная-память) значение
 ```asm
 @connect signdigit, coldisp ; Загрузить во время загрузки дискеты в память
 
@@ -100,7 +109,7 @@ image img, img.bmp ; Команда для создания изображени
 - [x] Добавить вывод на цифровой экран
 - [x] Добавить вывод на дисплей в монохромном режиме
 - [x] Добавить вывод на дисплей в цветном режиме
-- [ ] Сделать авто переключение между банками памяти при выполнении кода
+- [ ] Сделать авто переключение между [банками памяти](https://github.com/chubrik/LogicArrows/blob/main/computer-v2/specification.md#оперативная-память) при выполнении кода
 
 ## P. S.
 Я не умею писать нормальные README. Извините
