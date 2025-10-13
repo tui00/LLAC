@@ -41,33 +41,46 @@ public partial class Llac(string file)
 
     public string ConvertLine(string line, int number)
     {
-        Components components = GetComponents(line);
-
-        string[] fragment = [line];
-
-        if (commands.TryGetValue(components.Op, out var result))
+        try
         {
-            if (!result.condition(components.Args.Length))
-                Console.WriteLine($"[WARN] Invalid args for '{components.Op}' at line {number + 1}");
-            else
-                fragment = result.handler(components, this);
-        }
-        else if (TryHalfCommand(components, out string[] half)) fragment = half;
-        else if (TryAlias(components, out string[] alias)) fragment = alias;
+            Components components = GetComponents(line);
 
-        nextCmdAddr += GetLength(fragment);
+            string[] fragment = [line];
 
-        byte freeAddr = (byte)(0x40 + 0x20 * DisplayColorsCount);
+            if (commands.TryGetValue(components.Op, out var result))
+            {
+                if (!result.condition(components.Args.Length))
+                    Console.WriteLine($"[WARN] Invalid args for '{components.Op}' at line {number + 1}");
+                else
+                    fragment = result.handler(components, this);
+            }
+            else if (TryHalfCommand(components, out string[] half)) fragment = half;
+            else if (TryAlias(components, out string[] alias)) fragment = alias;
 
-        if (nextCmdAddr > 0x38 && nextCmdAddr < freeAddr)
-        {
-            nextCmdAddr -= GetLength(fragment);
-            fragment = [JumpOverPorts([3, freeAddr]), .. fragment];
             nextCmdAddr += GetLength(fragment);
-        }
 
-        return string.Join("\n", fragment);
+            byte freeAddr = (byte)(0x40 + 0x20 * DisplayColorsCount);
+
+            if (nextCmdAddr > 0x38 && nextCmdAddr < freeAddr)
+            {
+                nextCmdAddr -= GetLength(fragment);
+                fragment = [JumpOverPorts([3, freeAddr]), .. fragment];
+                nextCmdAddr += GetLength(fragment);
+            }
+
+            return string.Join("\n", fragment);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"[ERROR] {e.Message} at line {number + 1}");
+#if DEBUG
+            throw;
+#else
+            return line;
+#endif
+        }
     }
+
 
     private static string RemoveComments(string line)
     {

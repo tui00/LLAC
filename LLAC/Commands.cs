@@ -1,4 +1,5 @@
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Bmp;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace LLAC;
@@ -45,7 +46,7 @@ public partial class Llac
     {
         fragment = [];
         int argsCount = components.Args.Length;
-        switch (components.Op.ToLowerInvariant())
+        switch (components.Op)
         {
             case "@connect" when argsCount > 0 && argsCount <= 3:
                 connectedDevices = preConnectedDevices = GetDevices(components.Args);
@@ -132,7 +133,7 @@ public partial class Llac
 
     private static string[] Prepare(Components components, Llac _)
     {
-        string arg = components.Args[1].Trim();
+        string arg = components.Args[1];
         ushort baseValue = components.Args[0] switch
         {
             var s when s.Length == 3 && s.StartsWith('"') => s[1],
@@ -156,43 +157,71 @@ public partial class Llac
     private static byte GetDevices(string[] args)
     {
         byte devices = 0;
-        if (args.Contains("disp")) devices |= 1 << 4; // Устоновка экрана
-        else if (args.Contains("coldisp")) devices |= 3 << 4; // Устоновка цветного режима экрана
-        if (args.Contains("term")) devices |= 1 << 0; // Устоновка терминала
-        if (args.Contains("digit")) devices |= 1 << 2; // Устоновка счетчика
-        else if (args.Contains("signdigit")) devices |= 3 << 2; // Устоновка знакового режима счетчика
+        if (args.Contains("disp")) devices |= 1 << 4; // Установка экрана
+        else if (args.Contains("coldisp")) devices |= 3 << 4; // Установка цветного режима экрана
+        if (args.Contains("term")) devices |= 1 << 0; // Установка терминала
+        if (args.Contains("digit")) devices |= 1 << 2; // Установка счетчика
+        else if (args.Contains("signdigit")) devices |= 3 << 2; // Установка знакового режима счетчика
         return devices;
     }
 
     // === Утилиты ===
     private static byte[] GetImage(string path, bool useBlue)
     {
-        using var img = Image.Load<Rgba32>(path);
+        Image<Rgba32> img = Image.Load<Rgba32>(path);
+        try
+        {
+            if (img.Width > 16 || img.Height > 16) img = GetPixelArt(img);
+            if (img.Width < 16 || img.Height < 16) throw new ArgumentException("Изображение должно быть больше или равно 16x16");
 
-        var redBytes = new List<byte>();
-        var blueBytes = new List<byte>();
+            var redBytes = new List<byte>();
+            var blueBytes = new List<byte>();
 
-        int redByte = 0, blueByte = 0;
+            int redByte = 0, blueByte = 0;
+            for (int y = 0; y < 16; y++)
+            {
+                for (int x = 0; x < 16; x++)
+                {
+                    Rgba32 pixel = img[x, y];
+                    int rBit = pixel.R >> 7;
+                    int bBit = pixel.B >> 7;
+
+                    redByte |= (rBit | (useBlue ? 0 : bBit)) << (7 - x % 8);
+                    blueByte |= bBit << (7 - x % 8);
+
+                    if ((x + 1) % 8 == 0)
+                    {
+                        redBytes.Add((byte)redByte);
+                        blueBytes.Add((byte)blueByte);
+                        redByte = blueByte = 0;
+                    }
+                }
+            }
+
+            return useBlue ? [.. redBytes, .. blueBytes] : redBytes.ToArray();
+        }
+        finally
+        {
+            img.Dispose();
+        }
+    }
+
+    private static Image<Rgba32> GetPixelArt(Image<Rgba32> img)
+    {
+        Image<Rgba32> art = new(16, 16, new Rgba32(0, 0, 0, 0));
+        int cellWidth = img.Width / 16;
+        int cellHeight = img.Height / 16;
         for (int y = 0; y < 16; y++)
         {
             for (int x = 0; x < 16; x++)
             {
-                var pixel = img[x, y];
-                int rBit = pixel.R >> 7;
-                int bBit = pixel.B >> 7;
-
-                redByte |= (rBit | (useBlue ? 0 : bBit)) << (7 - x % 8);
-                blueByte |= bBit << (7 - x % 8);
-
-                if ((x + 1) % 8 == 0)
-                {
-                    redBytes.Add((byte)redByte);
-                    blueBytes.Add((byte)blueByte);
-                    redByte = blueByte = 0;
-                }
+                int centerX = Math.Min(x * cellWidth + cellWidth / 2, img.Width - 1);
+                int centerY = Math.Min(y * cellHeight + cellHeight / 2, img.Height - 1);
+                art[x, y] = img[centerX, centerY];
             }
         }
-
-        return useBlue ? redBytes.Concat(blueBytes).ToArray() : redBytes.ToArray();
+        art.Save("_tmpLLACimg.bmp", new BmpEncoder());
+        return art;
     }
+
 }
