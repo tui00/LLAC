@@ -9,6 +9,21 @@ public partial class Llac
     private byte preConnectedDevices = 0;
     private byte[] preImage = [];
 
+    private delegate string[] CommandHandler(Components components, Llac llac);
+    private delegate bool Condition(int argsCount);
+    private static readonly Dictionary<string, (Condition condition, CommandHandler handler)> commands = new()
+    {
+        ["connect"] = (a => a >= 1 && a <= 3, Connect),
+        ["readchar"] = (a => a == 1, ReadChar),
+        ["writechar"] = (a => a == 1, WriteChar),
+        ["writeline"] = (a => a == 1, WriteLine),
+        ["drawimage"] = (a => a == 1, DrawImage),
+        ["cleardisp"] = (a => a == 0, ClearDisplay),
+        ["writenum"] = (a => a == 1, WriteNum),
+        ["prepare"] = (a => a == 2, Prepare),
+        ["cleardigit"] = (a => a == 0, (_, _) => ["ldi a,0", $"st a,{0x3A}", $"st a,{0x3B}"])
+    };
+
     private bool TryAlias(Components components, out string[] fragment)
     {
         switch (components.Op)
@@ -43,14 +58,14 @@ public partial class Llac
     }
 
     // === Терминал ===
-    private static string[] WriteChar(Components components)
+    private static string[] WriteChar(Components components, Llac _)
     {
         return [$"st {components.Args[0]},{0x3C}"];
     }
 
-    private string[] WriteLine(Components components)
+    private static string[] WriteLine(Components components, Llac llac)
     {
-        string label = GetLabel();
+        string label = llac.GetLabel();
         return [
             $"ldi b,{components.Args[0]}", // Сохраняем в b адрес текста
             $"ldi d,{0x3C}", // Сохраняем в d адрес терминала
@@ -64,16 +79,16 @@ public partial class Llac
     }
 
     // === Клавиатура ===
-    private string[] ReadChar(Components components)
+    private static string[] ReadChar(Components components, Llac llac)
     {
-        string label = GetLabel();
+        string label = llac.GetLabel();
         return [$"{label}:ld {components.Args[0]},{0x3E}", $"test {components.Args[0]}", $"jz {label}"];
     }
 
     // === Дисплей ===
-    private string[] DrawImage(Components components)
+    private static string[] DrawImage(Components components, Llac llac)
     {
-        string label = GetLabel();
+        string label = llac.GetLabel();
         return [
             $"ldi b,{components.Args[0]}", // Сохраняем в b адрес изо
             $"ldi c,{components.Args[0]}_length", // Сохраняем длину
@@ -88,13 +103,13 @@ public partial class Llac
         ];
     }
 
-    private string[] ClearDisplay()
+    private static string[] ClearDisplay(Components _, Llac llac)
     {
-        string label = GetLabel();
+        string label = llac.GetLabel();
         return [
             $"ldi a,0",
             $"ldi d,{0x40}", // Сохраняем в d адрес дисплея
-            $"ldi c,{DisplayColorsCount * 0x20}",
+            $"ldi c,{llac.DisplayColorsCount * 0x20}",
             $"{label}:st a,d", // Записываем
             $"inc d",
             $"dec c",
@@ -103,7 +118,7 @@ public partial class Llac
     }
 
     // === Счетчик ===
-    private static string[] SetDigit(Components components)
+    private static string[] WriteNum(Components components, Llac _)
     {
         string arg = components.Args[0];
         string[] fragment = [];
@@ -115,7 +130,7 @@ public partial class Llac
         return fragment;
     }
 
-    private static string[] PrepareNum(Components components)
+    private static string[] Prepare(Components components, Llac _)
     {
         string arg = components.Args[1].Trim();
         ushort baseValue = components.Args[0] switch
@@ -131,10 +146,10 @@ public partial class Llac
     }
 
     // === Подключение устройств ===
-    private string[] Connect(Components components)
+    private static string[] Connect(Components components, Llac llac)
     {
         byte devices = GetDevices(components.Args);
-        connectedDevices = devices;
+        llac.connectedDevices = devices;
         return [$"ldi a,{devices}", $"st a,{0x3E}"];
     }
 

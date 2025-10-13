@@ -39,54 +39,21 @@ public partial class Llac(string file)
         return string.Join("\n", codeLines).Replace("\n\n", "\n").Trim();
     }
 
-    private static string RemoveComments(string line)
-    {
-        bool inString = false;
-        int i = 0;
-        while (i < line.Length)
-        {
-            char ch = line[i];
-            if (ch == '\\') i++;
-            else if (ch == '"') inString = !inString;
-            else if (ch == ';' && !inString) break;
-            i++;
-        }
-        if (i < 0) i = 0;
-        return line[..i].Trim(' ');
-    }
-
-    public string ConvertLine(string line)
+    public string ConvertLine(string line, int number)
     {
         Components components = GetComponents(line);
 
         string[] fragment = [line];
 
-        int argsCount = components.Args.Length;
-
-        switch (components.Op)
+        if (commands.TryGetValue(components.Op, out var result))
         {
-            // === Команды ===
-            case "connect" when argsCount > 0 && argsCount <= 3: fragment = Connect(components); break;
-
-            case "readchar" when argsCount == 1: fragment = ReadChar(components); break;
-            case "writechar" when argsCount == 1: fragment = WriteChar(components); break;
-            case "writeline" when argsCount == 1: fragment = WriteLine(components); break;
-
-            case "drawimage" when argsCount == 1: fragment = DrawImage(components); break;
-            case "cleardisp" when argsCount == 0: fragment = ClearDisplay(); break;
-
-            case "prepare" when argsCount == 2: fragment = PrepareNum(components); break;
-            case "writenum" when argsCount == 1: fragment = SetDigit(components); break;
-            case "cleardigit" when argsCount == 0: fragment = ["ldi a,0", $"st a,{0x3A}", $"st a,{0x3B}"]; break;
-
-            default:
-                // === Полу-команды ===
-                if (TryHalfCommand(components, out string[] halfCommandFragment)) fragment = halfCommandFragment;
-
-                // === Алиасы ===
-                if (TryAlias(components, out string[] aliasFragment)) fragment = aliasFragment;
-                break;
+            if (!result.condition(components.Args.Length))
+                Console.WriteLine($"[WARN] Invalid args for '{components.Op}' at line {number + 1}");
+            else
+                fragment = result.handler(components, this);
         }
+        else if (TryHalfCommand(components, out string[] half)) fragment = half;
+        else if (TryAlias(components, out string[] alias)) fragment = alias;
 
         nextCmdAddr += GetLength(fragment);
 
@@ -100,6 +67,27 @@ public partial class Llac(string file)
         }
 
         return string.Join("\n", fragment);
+    }
+
+    private static string RemoveComments(string line)
+    {
+        bool inString = false;
+        int i = 0;
+        while (i < line.Length)
+        {
+            char ch = line[i];
+            if (ch == '\\') i++;
+            else if (ch == '"') inString = !inString;
+            else if (ch == ';' && !inString) break;
+            i++;
+        }
+        if (i < 0) i = 0;
+        return line[..i].TrimEnd();
+    }
+
+    private string GetLabel()
+    {
+        return "_labelLLAC" + nextLabelId++;
     }
 
     private string JumpOverPorts(byte[]? additionalCode = null)
@@ -120,13 +108,9 @@ public partial class Llac(string file)
         return jmp;
     }
 
-    private string GetLabel()
-    {
-        return "_labelLLAC" + nextLabelId++;
-    }
-
     private static Components GetComponents(string line)
     {
+        line = line.Trim();
         string? label = null;
         string op = "";
         string[] args = [];
