@@ -4,7 +4,7 @@ namespace LLAC;
 
 public partial class Llac(string file)
 {
-    private static ((string name, bool[] argsAreReg)[] commands, int length)[] asmCommands = [([
+    private static readonly ((string name, bool[] argsAreReg)[] commands, int length)[] asmCommands = [([
         ("nop", []),
         ("hlt", []),
         ("inc", [true]),
