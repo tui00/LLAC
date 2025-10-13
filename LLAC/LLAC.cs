@@ -143,7 +143,6 @@ public partial class Llac(string file)
             else if (ch == ';' && !inString) break;
             i++;
         }
-        if (i < 0) i = 0;
         return line[..i].TrimEnd();
     }
 
