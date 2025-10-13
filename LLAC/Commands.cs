@@ -11,54 +11,40 @@ public partial class Llac
     private byte[] preImage = [];
 
     private delegate string[] CommandHandler(Components components, Llac llac);
-    private delegate bool Condition(int argsCount);
+    private delegate bool Condition(int argsCount, Components components);
     private static readonly Dictionary<string, (Condition condition, CommandHandler handler)> commands = new()
     {
-        ["connect"] = (a => a >= 1 && a <= 3, Connect),
-        ["readchar"] = (a => a == 1, ReadChar),
-        ["writechar"] = (a => a == 1, WriteChar),
-        ["writeline"] = (a => a == 1, WriteLine),
-        ["drawimage"] = (a => a == 1, DrawImage),
-        ["cleardisp"] = (a => a == 0, ClearDisplay),
-        ["writenum"] = (a => a == 1, WriteNum),
-        ["prepare"] = (a => a == 2, Prepare),
-        ["cleardigit"] = (a => a == 0, (_, _) => ["ldi a,0", $"st a,{0x3A}", $"st a,{0x3B}"])
+        ["connect"] = ((a, c) => a >= 1 && a <= 3, Connect),
+        ["readchar"] = ((a, c) => a == 1, ReadChar),
+        ["writechar"] = ((a, c) => a == 1, WriteChar),
+        ["writeline"] = ((a, c) => a == 1, WriteLine),
+        ["drawimage"] = ((a, c) => a == 1, DrawImage),
+        ["cleardisp"] = ((a, c) => a == 0, ClearDisplay),
+        ["writenum"] = ((a, c) => a == 1, WriteNum),
+        ["prepare"] = ((a, c) => a == 2, Prepare),
+        ["cleardigit"] = ((a, c) => a == 0, (_, _) => ["ldi a,0", $"st a,{0x3A}", $"st a,{0x3B}"]),
+
+        ["exit"] = ((a, c) => a == 0, (_, _) => ["hlt"]),
+        ["string"] = ((a, c) => a == 2, (c, _) => [$"{c.Args[0]}:db {string.Join(',', c.Args[1..])},0"]),
+        ["image"] = ((a, c) => a == 2 && File.Exists(c.Args[1]), (c, l) => [$"{c.Args[0]}:db {string.Join(',', GetImage(c.Args[1], (l.connectedDevices & 1 << 5) == 1 << 5))}", $"{c.Args[0]}_length equ $-{c.Args[0]}"]),
+
+        ["@image"] = ((a, c) => a == 2 && File.Exists(c.Args[0]), PreImage),
+        ["@connect"] = ((a, c) => a > 0 && a <= 3, PreConnect),
     };
 
-    private bool TryAlias(Components components, out string[] fragment)
+    private static string[] PreImage(Components components, Llac llac)
     {
-        switch (components.Op)
-        {
-            case "exit": fragment = ["hlt"]; return true;
-            case "string": fragment = [$"{components.Args[0]}:db {string.Join(',', components.Args[1..])},0"]; return true;
-            case "image":
-                fragment = [
-                    $"{components.Args[0]}:db {string.Join(',', GetImage(components.Args[1], (connectedDevices & 1 << 5) == 1 << 5))}",
-                    $"{components.Args[0]}_length equ $-{components.Args[0]}"
-                ];
-                return true;
-        }
-        fragment = [];
-        return false;
+        llac.preImage = GetImage(components.Args[0], llac.DisplayColorsCount == 2);
+        return [];
     }
 
-    private bool TryHalfCommand(Components components, out string[] fragment)
+    private static string[] PreConnect(Components components, Llac llac)
     {
-        fragment = [];
-        int argsCount = components.Args.Length;
-        switch (components.Op)
-        {
-            case "@connect" when argsCount > 0 && argsCount <= 3:
-                connectedDevices = preConnectedDevices = GetDevices(components.Args);
-                return true;
-            case "@image" when argsCount == 1 && File.Exists(components.Args[0]):
-                preImage = GetImage(components.Args[0], ((connectedDevices >> 5) & 1) == 1);
-                return true;
-        }
-        return false;
+        llac.preConnectedDevices = llac.connectedDevices = GetDevices(components.Args);
+        return [];
     }
 
-    // === Терминал ===
+    #region Терминал
     private static string[] WriteChar(Components components, Llac _)
     {
         return [$"st {components.Args[0]},{0x3C}"];
@@ -78,15 +64,17 @@ public partial class Llac
             $"jnz {label}",
         ];
     }
+    #endregion
 
-    // === Клавиатура ===
+    #region Клавиатура
     private static string[] ReadChar(Components components, Llac llac)
     {
         string label = llac.GetLabel();
         return [$"{label}:ld {components.Args[0]},{0x3E}", $"test {components.Args[0]}", $"jz {label}"];
     }
+    #endregion
 
-    // === Дисплей ===
+    #region Дисплей
     private static string[] DrawImage(Components components, Llac llac)
     {
         string label = llac.GetLabel();
@@ -117,8 +105,9 @@ public partial class Llac
             $"jnz {label}"
         ];
     }
+    #endregion
 
-    // === Счетчик ===
+    #region Счетчик
     private static string[] WriteNum(Components components, Llac _)
     {
         string arg = components.Args[0];
@@ -145,8 +134,9 @@ public partial class Llac
         };
         return [$"ldi {arg.Split(':')[1]},{baseValue & 0xFF}", $"ldi {arg.Split(':')[0]},{baseValue >> 8}"];
     }
+    #endregion
 
-    // === Подключение устройств ===
+    #region Подключение устройств
     private static string[] Connect(Components components, Llac llac)
     {
         byte devices = GetDevices(components.Args);
@@ -164,15 +154,17 @@ public partial class Llac
         else if (args.Contains("signdigit")) devices |= 3 << 2; // Установка знакового режима счетчика
         return devices;
     }
+    #endregion
 
-    // === Утилиты ===
+    #region Утилиты
     private static byte[] GetImage(string path, bool useBlue)
     {
         Image<Rgba32> img = Image.Load<Rgba32>(path);
         try
         {
             if (img.Width > 16 || img.Height > 16) img = GetPixelArt(img);
-            if (img.Width < 16 || img.Height < 16) throw new ArgumentException("Изображение должно быть больше или равно 16x16");
+            if (img.Width < 16 || img.Height < 16) throw new ArgumentException("The image must be larger or equal to 16x16");
+            img.Save("_tmpLLACimg.bmp", new BmpEncoder());
 
             var redBytes = new List<byte>();
             var blueBytes = new List<byte>();
@@ -220,8 +212,7 @@ public partial class Llac
                 art[x, y] = img[centerX, centerY];
             }
         }
-        art.Save("_tmpLLACimg.bmp", new BmpEncoder());
         return art;
     }
-
+    #endregion
 }

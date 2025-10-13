@@ -49,13 +49,11 @@ public partial class Llac(string file)
 
             if (commands.TryGetValue(components.Op, out var result))
             {
-                if (!result.condition(components.Args.Length))
+                if (!result.condition(components.Args.Length, components))
                     Console.WriteLine($"[WARN] Invalid args for '{components.Op}' at line {number + 1}");
                 else
                     fragment = result.handler(components, this);
             }
-            else if (TryHalfCommand(components, out string[] half)) fragment = half;
-            else if (TryAlias(components, out string[] alias)) fragment = alias;
 
             nextCmdAddr += GetLength(fragment);
 
@@ -72,7 +70,7 @@ public partial class Llac(string file)
         }
         catch (Exception e)
         {
-            Console.WriteLine($"[ERROR] {e.Message} at line {number + 1}");
+            Console.WriteLine($"[ERROR] Error \"{e.Message}\" at line {number + 1}");
 #if DEBUG
             throw;
 #else
