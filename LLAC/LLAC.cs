@@ -4,6 +4,56 @@ namespace LLAC;
 
 public partial class Llac(string file)
 {
+    private static ((string cmd, bool[] state)[] cmds, int len)[] asmCommands = [([
+        ("nop", []),
+        ("hlt", []),
+        ("inc", [true]),
+        ("dec", [true]),
+        ("add", [true, true]),
+        ("adc", [true, true]),
+        ("sub", [true, true]),
+        ("sbb", [true, true]),
+        ("neg", [true]),
+        ("not", [true]),
+        ("and", [true, true]),
+        ("or", [true, true]),
+        ("xor", [true, true]),
+        ("mov", [true, true]),
+        ("clr", [true]),
+        ("rnd", [true]),
+        ("test", [true]),
+        ("shl", [true]),
+        ("shr", [true]),
+        ("sar", [true]),
+        ("rcl", [true]),
+        ("rcr", [true]),
+        ("ld", [true, true]),
+        ("st", [true, true]),
+        ("jmp", [true]),
+        ("jz", [true]),
+        ("js", [true]),
+        ("jc", [true]),
+        ("jo", [true]),
+        ("jnz", [true]),
+        ("jns", [true]),
+        ("jnc", [true]),
+        ("jno", [true]),
+    ], 1),
+    ([
+        ("jmp", [false]),
+        ("jz", [false]),
+        ("js", [false]),
+        ("jc", [false]),
+        ("jo", [false]),
+        ("jnz", [false]),
+        ("jns", [false]),
+        ("jnc", [false]),
+        ("jno", [false]),
+        ("ld", [true, false]),
+        ("st", [true, false]),
+        ("ldi", [false])
+    ],2), ([("db", [])], -1)];
+
     public readonly string file = file;
 
     private int nextLabelId = 0;
@@ -79,6 +129,7 @@ public partial class Llac(string file)
         }
     }
 
+    private static bool IsRegister(string arg) => arg is "a" or "b" or "c" or "d";
 
     private static string RemoveComments(string line)
     {
@@ -156,83 +207,6 @@ public partial class Llac(string file)
             args = [.. args, curArg.ToString().Trim()];
 
         return new(label, op.ToLower(), args);
-    }
-
-    public static byte GetLength(string[] fragment)
-    {
-        byte length = 0;
-
-        foreach (var line in fragment)
-        {
-            Components components = GetComponents(line);
-
-            string op = components.Op;
-            string[] args = components.Args;
-
-            bool arg1reg = args.Length > 0 && (args[0] is "a" or "b" or "c" or "d");
-            bool arg2reg = args.Length > 1 && (args[1] is "a" or "b" or "c" or "d");
-            switch (op)
-            {
-                case "nop":
-                case "hlt":
-                case "inc":
-                case "dec":
-                case "test":
-                case "neg":
-                case "not":
-                case "ld" when arg2reg:
-                case "st" when arg2reg:
-                case "jmp" when arg1reg:
-                case "jz" when arg1reg:
-                case "js" when arg1reg:
-                case "jc" when arg1reg:
-                case "jo" when arg1reg:
-                case "jnz" when arg1reg:
-                case "jns" when arg1reg:
-                case "jnc" when arg1reg:
-                case "jno" when arg1reg:
-                case "clr":
-                case "mov":
-                case "and":
-                case "or":
-                case "xor":
-                case "add":
-                case "adc":
-                case "sub":
-                case "sbb":
-                case "rnd":
-                case "shl":
-                case "shr":
-                case "sar":
-                case "rcl":
-                case "rcr":
-                    length += 1;
-                    break;
-
-                case "jmp" when !arg1reg:
-                case "jz" when !arg1reg:
-                case "js" when !arg1reg:
-                case "jc" when !arg1reg:
-                case "jo" when !arg1reg:
-                case "jnz" when !arg1reg:
-                case "jns" when !arg1reg:
-                case "jnc" when !arg1reg:
-                case "jno" when !arg1reg:
-                case "ld" when !arg2reg:
-                case "st" when !arg2reg:
-                case "ldi":
-                    length += 2;
-                    break;
-
-                case "db":
-                    foreach (var arg in args)
-                        length += (byte)(arg.StartsWith('"') ? arg.Replace("\\", "").Length - 2 : 1);
-
-                    break;
-            }
-        }
-
-        return length;
     }
 }
 
