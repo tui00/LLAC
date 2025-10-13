@@ -5,8 +5,11 @@
 [![Last release version](https://img.shields.io/github/v/release/tui00/LLAC?include_prereleases)](https://github.com/tui00/LLAC/releases)
 [![Static Badge](https://img.shields.io/badge/English-README-red)](https://github-com.translate.goog/tui00/LLAC/blob/main/README.md?_x_tr_sl=ru&_x_tr_tl=en&_x_tr_hl=ru&_x_tr_pto=wapp)
 
-### Краткое описание
+## Краткое описание
 Это мини-преобразователь простых команд в сложные конструкции для asembler-а [компьютера](https://logic-arrows.io/map-computer) **второй версии** из игры [logic-arrows](https://logic-arrows/)
+
+## Этот проект еще не готов!
+Если я захочу, я буду менять имя, аргументы и что делают команды хоть каждый день.
 
 ## Скачивание проекта
 > **⚠️ Этими способами вы можете скачать только `Debug` версию. Если нужна `Release` версия, перейдите во вкладку [`Releases`](https://github.com/tui00/LLAC/releases)**
