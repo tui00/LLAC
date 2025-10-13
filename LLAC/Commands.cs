@@ -12,7 +12,7 @@ public partial class Llac
 
     private delegate string[] CommandHandler(Components components, Llac llac);
     private delegate bool Condition(int argsCount, Components components);
-    private static readonly Dictionary<string, (Condition condition, CommandHandler handler)> commands = new()
+    private static readonly Dictionary<string, (Condition condition, CommandHandler handler)> llacCommands = new()
     {
         ["connect"] = ((a, c) => a >= 1 && a <= 3, Connect),
         ["readchar"] = ((a, c) => a == 1, ReadChar),
@@ -28,7 +28,7 @@ public partial class Llac
         ["string"] = ((a, c) => a == 2, (c, _) => [$"{c.Args[0]}:db {string.Join(',', c.Args[1..])},0"]),
         ["image"] = ((a, c) => a == 2 && File.Exists(c.Args[1]), (c, l) => [$"{c.Args[0]}:db {string.Join(',', GetImage(c.Args[1], (l.connectedDevices & 1 << 5) == 1 << 5))}", $"{c.Args[0]}_length equ $-{c.Args[0]}"]),
 
-        ["@image"] = ((a, c) => a == 2 && File.Exists(c.Args[0]), PreImage),
+        ["@image"] = ((a, c) => a == 1 && File.Exists(c.Args[0]), PreImage),
         ["@connect"] = ((a, c) => a > 0 && a <= 3, PreConnect),
     };
 

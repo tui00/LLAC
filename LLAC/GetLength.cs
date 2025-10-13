@@ -12,22 +12,10 @@ public partial class Llac
         return length;
     }
 
-    private static byte GetCommandLength(string op, string[] args)
+    private static byte GetCommandLength(Components components)
     {
-        bool arg1reg = args.Length > 0 && IsRegister(args[0]);
-        bool arg2reg = args.Length > 1 && IsRegister(args[1]);
-
-        foreach (var (cmds, len) in asmCommands)
-        {
-            foreach (var cmd in cmds)
-            {
-                if (cmd.cmd != op) continue;
-                if (cmd.state[0] && !arg1reg) continue;
-                if (cmd.state[1] && !arg2reg) continue;
-                return (byte)len;
-            }
-        }
-        return 0;
+        if (TryFindAsmCommand(components, out var command)) return command.length;
+        throw new ArgumentException($"The command \"{components.Op}\" was not found or is being used incorrectly");
     }
 
     public static byte GetLength(string[] fragment)
@@ -41,7 +29,7 @@ public partial class Llac
             if (components.Op == "db")
                 length += GetDbLength(components.Args);
             else
-                length += GetCommandLength(components.Op, components.Args);
+                length += GetCommandLength(components);
         }
 
         return length;

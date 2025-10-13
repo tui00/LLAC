@@ -4,7 +4,7 @@ namespace LLAC;
 
 public partial class Llac(string file)
 {
-    private static ((string cmd, bool[] state)[] cmds, int len)[] asmCommands = [([
+    private static ((string name, bool[] argsAreReg)[] commands, int length)[] asmCommands = [([
         ("nop", []),
         ("hlt", []),
         ("inc", [true]),
@@ -51,7 +51,7 @@ public partial class Llac(string file)
         ("jno", [false]),
         ("ld", [true, false]),
         ("st", [true, false]),
-        ("ldi", [false])
+        ("ldi", [true, false])
     ],2), ([("db", [])], -1)];
 
     public readonly string file = file;
@@ -91,20 +91,26 @@ public partial class Llac(string file)
 
     public string ConvertLine(string line, int number)
     {
+        line = RemoveComments(line.Trim());
+        if (string.IsNullOrWhiteSpace(line)) return "";
         try
         {
             Components components = GetComponents(line);
+            if (components.Op == "" && components.Label != null) return components.Label;
 
-            string[] fragment = [line];
+            string[] fragment;
 
-            if (commands.TryGetValue(components.Op, out var result))
+            if (llacCommands.TryGetValue(components.Op, out var result))
             {
                 if (!result.condition(components.Args.Length, components))
-                    Console.WriteLine($"[WARN] Invalid args for '{components.Op}' at line {number + 1}");
+                    throw new ArgumentException($"Invalid args for \"{components.Op}\"");
                 else
                     fragment = result.handler(components, this);
             }
-
+            else
+            {
+                fragment = [$"{components.Label}{(components.Label != null ? ":":"")}{components.Op} {string.Join(',', components.Args)}"];
+            }
             nextCmdAddr += GetLength(fragment);
 
             byte freeAddr = (byte)(0x40 + 0x20 * DisplayColorsCount);
@@ -118,14 +124,15 @@ public partial class Llac(string file)
 
             return string.Join("\n", fragment);
         }
+        catch (ArgumentException e)
+        {
+            Console.WriteLine($"[WARN] {e.Message} (at line {number + 1})");
+            return line;
+        }
         catch (Exception e)
         {
-            Console.WriteLine($"[ERROR] Error \"{e.Message}\" at line {number + 1}");
-#if DEBUG
-            throw;
-#else
+            Console.WriteLine($"[ERROR] {e.Message} (at line {number + 1})");
             return line;
-#endif
         }
     }
 
@@ -171,12 +178,9 @@ public partial class Llac(string file)
 
     private static Components GetComponents(string line)
     {
-        line = line.Trim();
         string? label = null;
         string op = "";
         string[] args = [];
-
-        line = RemoveComments(line);
 
         if (line.Split(' ')[0].Contains(':'))
         {
@@ -206,6 +210,24 @@ public partial class Llac(string file)
             args = [.. args, curArg.ToString().Trim()];
 
         return new(label, op.ToLower(), args);
+    }
+
+    private static bool TryFindAsmCommand(Components components, out (string name, bool[] argsAreReg, byte length) command)
+    {
+        foreach (var (commands, length) in asmCommands)
+        {
+            foreach (var (name, argsAreReg) in commands)
+            {
+                if (name != components.Op) continue;
+                if (components.Args.Length < argsAreReg.Length) continue;
+                if (argsAreReg.Index().Any(el => IsRegister(components.Args[el.Index]) != el.Item)) continue;
+
+                command = (name, argsAreReg, (byte)length);
+                return true;
+            }
+        }
+        command = default;
+        return false;
     }
 }
 
