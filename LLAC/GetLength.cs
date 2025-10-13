@@ -18,7 +18,7 @@ public partial class Llac
         throw new ArgumentException($"The command \"{components.Op}\" was not found or is being used incorrectly");
     }
 
-    public static byte GetLength(string[] fragment)
+    private static byte GetLength(string[] fragment)
     {
         byte length = 0;
 

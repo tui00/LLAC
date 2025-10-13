@@ -86,7 +86,7 @@ public partial class Llac(string file)
             }
         }
 
-        return string.Join("\n", codeLines).Replace("\n\n", "\n").Trim();
+        return string.Join("\n", codeLines.Where(line => !string.IsNullOrEmpty(line))).Trim();
     }
 
     public string ConvertLine(string line, int number)
@@ -96,7 +96,7 @@ public partial class Llac(string file)
         try
         {
             Components components = GetComponents(line);
-            if (components.Op == "" && components.Label != null) return components.Label;
+            if (components.Op == "" && components.Label != null) return (string)components;
 
             string[] fragment;
 
@@ -109,7 +109,7 @@ public partial class Llac(string file)
             }
             else
             {
-                fragment = [$"{components.Label}{(components.Label != null ? ":":"")}{components.Op} {string.Join(',', components.Args)}"];
+                fragment = [(string)components];
             }
             nextCmdAddr += GetLength(fragment);
 
@@ -230,5 +230,3 @@ public partial class Llac(string file)
         return false;
     }
 }
-
-public record Components(string? Label, string Op, string[] Args);
