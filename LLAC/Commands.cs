@@ -1,18 +1,15 @@
+using System.Collections.ObjectModel;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Bmp;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace LLAC;
 
-public partial class Llac
+public static class Commands
 {
-    private byte connectedDevices = 0;
-    private byte preConnectedDevices = 0;
-    private byte[] preImage = [];
-
-    private delegate string[] CommandHandler(Components components, Llac llac);
-    private delegate bool Condition(int argsCount, Components components);
-    private static readonly Dictionary<string, (Condition condition, CommandHandler handler)> llacCommands = new()
+    public delegate string[] CommandHandler(Components components, Llac llac);
+    public delegate bool Condition(int argsCount, Components components);
+    public static ReadOnlyDictionary<string, (Condition condition, CommandHandler handler)> LlacCommands { get; set; } = new(new Dictionary<string, (Condition condition, CommandHandler handler)>()
     {
         ["connect"] = ((a, c) => a >= 1 && a <= 3, Connect),
         ["readchar"] = ((a, c) => a == 1, ReadChar),
@@ -26,11 +23,11 @@ public partial class Llac
 
         ["exit"] = ((a, c) => a == 0, (_, _) => ["hlt"]),
         ["string"] = ((a, c) => a == 2, (c, _) => [$"{c.Args[0]}:db {string.Join(',', c.Args[1..])},0"]),
-        ["image"] = ((a, c) => a == 2 && File.Exists(c.Args[1]), (c, l) => [$"{c.Args[0]}:db {string.Join(',', GetImage(c.Args[1], (l.connectedDevices & 1 << 5) == 1 << 5))}", $"{c.Args[0]}_length equ $-{c.Args[0]}"]),
+        ["image"] = ((a, c) => a == 2 && File.Exists(c.Args[1]), (c, l) => [$"{c.Args[0]}:db {string.Join(',', GetImage(c.Args[1], (l.ConnectedDevices & 1 << 5) != 0))}", $"{c.Args[0]}_length equ $-{c.Args[0]}"]),
 
         ["@image"] = ((a, c) => a == 1 && File.Exists(c.Args[0]), PreImage),
         ["@connect"] = ((a, c) => a > 0 && a <= 3, PreConnect),
-    };
+    });
 
     private static (Condition condition, CommandHandler handler) DeprecatedCmd((Condition condition, CommandHandler handler) command, string name, string recomendedCommand)
     {
@@ -40,13 +37,13 @@ public partial class Llac
 
     private static string[] PreImage(Components components, Llac llac)
     {
-        llac.preImage = GetImage(components.Args[0], llac.DisplayColorsCount == 2);
+        llac.PreImage = GetImage(components.Args[0], llac.DisplayColorsCount == 2);
         return [];
     }
 
     private static string[] PreConnect(Components components, Llac llac)
     {
-        llac.preConnectedDevices = llac.connectedDevices = GetDevices(components.Args);
+        llac.PreConnectedDevices = llac.ConnectedDevices = GetDevices(components.Args);
         return [];
     }
 
@@ -146,7 +143,7 @@ public partial class Llac
     private static string[] Connect(Components components, Llac llac)
     {
         byte devices = GetDevices(components.Args);
-        llac.connectedDevices = devices;
+        llac.ConnectedDevices = devices;
         return [$"ldi a,{devices}", $"st a,{0x3E}"];
     }
 
