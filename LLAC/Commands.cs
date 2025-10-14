@@ -32,6 +32,12 @@ public partial class Llac
         ["@connect"] = ((a, c) => a > 0 && a <= 3, PreConnect),
     };
 
+    private static (Condition condition, CommandHandler handler) DeprecatedCmd((Condition condition, CommandHandler handler) command, string name, string recomendedCommand)
+    {
+        Console.WriteLine($"[WARN] Command \"{name}\" is deprecated. Use {recomendedCommand} instead.");
+        return command;
+    }
+
     private static string[] PreImage(Components components, Llac llac)
     {
         llac.preImage = GetImage(components.Args[0], llac.DisplayColorsCount == 2);
